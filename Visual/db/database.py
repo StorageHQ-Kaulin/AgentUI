@@ -136,9 +136,9 @@ class Database:
 
     def create_component(
         self,
-        id: str,
         project_id: str,
         label: str,
+        id: str = None,  # Made optional
         parent_id: str = None,
         type: str = 'node',
         status: str = 'pending',
@@ -157,6 +157,10 @@ class Database:
         agent_id: str = None
     ) -> Component:
         """Create a new component (or replace if exists)."""
+        if not id:
+            import uuid
+            id = f"comp_{uuid.uuid4().hex[:8]}"
+
         with self.connection() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO components

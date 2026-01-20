@@ -14,8 +14,13 @@ from datetime import datetime
 
 from .rate_limiter import RateLimiter
 import sys
+# Add parent directory to path for db import
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from db import Database
+try:
+    from db import Database
+except ImportError:
+    # Fallback if running from root
+    from Visual.db import Database
 
 
 @dataclass

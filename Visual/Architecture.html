@@ -1,0 +1,3560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture View - Agent Orchestrator</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-color: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent-color: #00ffcc;
+            --accent-warn: #f0ad4e;
+            --accent-danger: #f85149;
+            --accent-success: #3fb950;
+            --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            --font-mono: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .header .project-name {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-color);
+        }
+
+        .btn-success {
+            background: var(--accent-success);
+            color: #000;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 57px);
+        }
+
+        /* Left Panel - Component Tree */
+        .left-panel {
+            width: 320px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .panel-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .component-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            min-height: 0;
+        }
+
+        .component-item {
+            padding: 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .component-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-color);
+        }
+
+        .component-item.selected {
+            background: rgba(0, 255, 204, 0.1);
+            border-color: var(--accent-color);
+        }
+
+        .component-item.root {
+            border-left: 3px solid #a855f7;
+        }
+
+        .component-item.service {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .component-item.api {
+            border-left: 3px solid #22c55e;
+        }
+
+        .component-item.data {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .component-item.ui {
+            border-left: 3px solid #ec4899;
+        }
+
+        .component-item.security {
+            border-left: 3px solid #ef4444;
+        }
+
+        .component-label {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .component-type {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .component-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Center Panel - Diagram */
+        .center-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-image: radial-gradient(#222 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-color: #0a0c0f;
+            position: relative;
+        }
+
+        .diagram-header {
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .diagram-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-color);
+        }
+
+        .diagram-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .zoom-btn:hover {
+            border-color: var(--accent-color);
+        }
+
+        #mermaid-container {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+
+        #mermaid-container:active {
+            cursor: grabbing;
+        }
+
+        #mermaid-viewport {
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+            padding: 40px;
+        }
+
+        #mermaid-viewport svg {
+            max-width: none !important;
+            height: auto !important;
+        }
+
+        /* Right Panel - Component Details */
+        .right-panel {
+            width: 450px;
+            background: var(--card-bg);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .detail-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .detail-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .detail-type {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .detail-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            min-height: 0;
+        }
+
+        #detailView {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .detail-section p {
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-color);
+        }
+
+        .detail-list {
+            list-style: none;
+        }
+
+        .detail-list li {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 13px;
+            border-left: 2px solid var(--border-color);
+        }
+
+        .detail-list li.goal {
+            border-left-color: var(--accent-color);
+        }
+
+        .detail-list li.requirement {
+            border-left-color: #3b82f6;
+        }
+
+        .detail-list li.risk {
+            border-left-color: var(--accent-danger);
+        }
+
+        /* Metrics & Test Cases */
+        .metric-card, .test-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .metric-header, .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .metric-name, .test-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .metric-target {
+            font-size: 12px;
+            color: var(--accent-color);
+        }
+
+        .status-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .status-passing {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .status-failing {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        /* PRD Styles */
+        .prd-section {
+            margin-bottom: 20px;
+        }
+
+        .prd-section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .prd-section-number {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-color);
+            color: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .prd-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .prd-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .prd-field {
+            margin-bottom: 12px;
+        }
+
+        .prd-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .prd-field label {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .prd-field p {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        /* Scope Grid */
+        .scope-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .scope-column {
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .scope-column.scope-in {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .scope-column.scope-out {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .scope-header {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .scope-in .scope-header {
+            color: #22c55e;
+        }
+
+        .scope-out .scope-header {
+            color: #ef4444;
+        }
+
+        .scope-column ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .scope-column ul li {
+            font-size: 12px;
+            padding: 4px 0 4px 14px;
+            position: relative;
+            color: var(--text-color);
+        }
+
+        .scope-in ul li::before {
+            content: "+";
+            position: absolute;
+            left: 0;
+            color: #22c55e;
+            font-weight: 700;
+        }
+
+        .scope-out ul li::before {
+            content: "×";
+            position: absolute;
+            left: 0;
+            color: #ef4444;
+            font-weight: 700;
+        }
+
+        /* Interface Grid */
+        .interface-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .interface-column {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .interface-header {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .interface-header.data-in-header {
+            color: #22c55e;
+        }
+
+        .interface-header.data-out-header {
+            color: #3b82f6;
+        }
+
+        .schema-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .schema-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .schema-name {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .schema-type {
+            color: #a855f7;
+        }
+
+        .schema-desc {
+            color: var(--text-muted);
+            font-family: var(--font-main);
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* Method Card */
+        .method-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .method-signature {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--accent-color);
+            margin-bottom: 6px;
+        }
+
+        .method-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .method-params {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .method-params code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: #a855f7;
+        }
+
+        /* Acceptance & Edge Cases */
+        .acceptance-list, .edge-case-list, .error-list, .assumption-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .acceptance-list li {
+            font-size: 12px;
+            padding: 6px 0 6px 20px;
+            position: relative;
+            color: var(--text-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .acceptance-list li:last-child {
+            border-bottom: none;
+        }
+
+        .acceptance-list li::before {
+            content: "☐";
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+        }
+
+        .edge-case-list li {
+            font-size: 12px;
+            padding: 6px 0 6px 20px;
+            position: relative;
+            color: var(--text-color);
+        }
+
+        .edge-case-list li::before {
+            content: "⚠";
+            position: absolute;
+            left: 0;
+            color: #f59e0b;
+        }
+
+        .error-list li {
+            font-size: 12px;
+            padding: 6px 0 6px 20px;
+            position: relative;
+            color: var(--text-color);
+        }
+
+        .error-list li::before {
+            content: "⛔";
+            position: absolute;
+            left: 0;
+            color: #ef4444;
+            font-size: 10px;
+        }
+
+        .assumption-list li {
+            font-size: 12px;
+            padding: 4px 0 4px 16px;
+            position: relative;
+            color: var(--text-muted);
+        }
+
+        .assumption-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--text-muted);
+        }
+
+        /* File List */
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 6px;
+        }
+
+        .file-icon {
+            font-size: 14px;
+        }
+
+        .file-path {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-color);
+        }
+
+        .file-purpose {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            margin-bottom: 8px;
+            color: var(--text-color);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Architecture Notes */
+        .arch-notes {
+            background: rgba(0, 255, 204, 0.05);
+            border: 1px solid rgba(0, 255, 204, 0.2);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Tactical Implementation Steps */
+        .impl-step {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .impl-step:hover {
+            border-color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.03);
+        }
+
+        .step-number {
+            width: 28px;
+            height: 28px;
+            background: var(--accent-color);
+            color: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: var(--text-color);
+        }
+
+        .step-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .step-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .step-file {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+        }
+
+        .step-how {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            border-left: 2px solid var(--accent-color);
+        }
+
+        .how-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .how-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .how-list li {
+            font-size: 11px;
+            color: var(--text-color);
+            padding: 3px 0 3px 16px;
+            position: relative;
+            line-height: 1.4;
+        }
+
+        .how-list li::before {
+            content: "•";
+            position: absolute;
+            left: 4px;
+            color: var(--text-muted);
+        }
+
+        .step-data-flow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .data-flow-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .data-flow-item.data-in {
+            border-left: 2px solid #22c55e;
+            padding-left: 8px;
+        }
+
+        .data-flow-item.data-out {
+            border-left: 2px solid #3b82f6;
+            padding-left: 8px;
+        }
+
+        .flow-label {
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-in .flow-label {
+            color: #22c55e;
+        }
+
+        .data-out .flow-label {
+            color: #3b82f6;
+        }
+
+        .flow-value {
+            color: var(--text-muted);
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .data-flow-arrow {
+            color: var(--text-muted);
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        /* Dependencies */
+        .dep-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 3px 8px;
+            background: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+            border-radius: 4px;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .quick-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            border-color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.1);
+        }
+
+        /* Edge Legend */
+        .edge-legend {
+            display: flex;
+            gap: 16px;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-line {
+            width: 20px;
+            height: 2px;
+        }
+
+        .legend-line.data { background: #22c55e; }
+        .legend-line.api { background: #3b82f6; }
+        .legend-line.auth { background: #ef4444; }
+        .legend-line.schema { background: #f59e0b; }
+        .legend-line.event { background: #a855f7; }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .right-panel {
+                display: none;
+            }
+        }
+
+        /* AI Chat Bubble */
+        .chat-bubble {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 255, 204, 0.3);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .chat-bubble:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 30px rgba(0, 255, 204, 0.4);
+        }
+
+        .chat-bubble svg {
+            width: 28px;
+            height: 28px;
+            fill: #000;
+        }
+
+        .chat-panel {
+            position: fixed;
+            bottom: 90px;
+            right: 24px;
+            width: 380px;
+            height: 500px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow: hidden;
+            resize: both;
+            min-width: 320px;
+            min-height: 400px;
+        }
+
+        .chat-panel.open {
+            display: flex;
+        }
+
+        .chat-header {
+            padding: 14px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .chat-header:active {
+            cursor: grabbing;
+        }
+
+        .chat-header .drag-hint {
+            font-size: 10px;
+            color: var(--text-muted);
+            opacity: 0.5;
+        }
+
+        /* Clickable PRD sections when chat is open */
+        .prd-section.chat-clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .prd-section.chat-clickable:hover {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
+
+        .prd-section.chat-clickable:hover .prd-section-title::after {
+            content: " - Click to discuss";
+            font-size: 10px;
+            color: var(--accent-color);
+            font-weight: 400;
+        }
+
+        .prd-section.chat-active {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+            border-radius: 8px;
+            background: rgba(0, 255, 204, 0.03);
+        }
+
+        .chat-header-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .chat-header-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .chat-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 20px;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .chat-close:hover {
+            color: var(--text-color);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .chat-message.user {
+            align-self: flex-end;
+            background: var(--accent-color);
+            color: #000;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.ai {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-color);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.ai.typing {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .chat-input-area {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-color);
+            font-size: 13px;
+            outline: none;
+        }
+
+        .chat-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .chat-send {
+            padding: 10px 16px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chat-send:hover {
+            filter: brightness(1.1);
+        }
+
+        .chat-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .chat-context {
+            padding: 8px 12px;
+            background: rgba(0, 255, 204, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .chat-context strong {
+            color: var(--accent-color);
+        }
+
+        .chat-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chat-suggestion {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chat-suggestion:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>Architecture View</h1>
+            <span class="project-name" id="projectName">Loading...</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="window.location.href='Interview.html'">Back to Interview</button>
+            <button class="btn btn-secondary" onclick="regenerateArchitecture()">Regenerate</button>
+            <button class="btn btn-success" onclick="approveDesign()">Approve Design</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Left Panel: Component Tree -->
+        <div class="left-panel">
+            <div class="panel-header">
+                Components (<span id="componentCount">0</span>)
+            </div>
+            <div class="component-tree" id="componentTree">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel: Diagram -->
+        <div class="center-panel">
+            <div class="diagram-header">
+                <span class="diagram-title">System Architecture</span>
+                <div class="diagram-controls">
+                    <button class="zoom-btn" onclick="zoomIn()">+</button>
+                    <button class="zoom-btn" onclick="zoomOut()">-</button>
+                    <button class="zoom-btn" onclick="resetZoom()">R</button>
+                </div>
+            </div>
+            <div id="mermaid-container">
+                <div id="mermaid-viewport">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Generating diagram...
+                    </div>
+                </div>
+            </div>
+            <div class="edge-legend">
+                <div class="legend-item"><div class="legend-line data"></div> Data Flow</div>
+                <div class="legend-item"><div class="legend-line api"></div> API Call</div>
+                <div class="legend-item"><div class="legend-line auth"></div> Auth</div>
+                <div class="legend-item"><div class="legend-line schema"></div> Schema</div>
+                <div class="legend-item"><div class="legend-line event"></div> Event</div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Component Details -->
+        <div class="right-panel" id="rightPanel">
+            <div class="empty-state" id="emptyState">
+                <h3>Select a Component</h3>
+                <p>Click on a component to view its details</p>
+            </div>
+            <div id="detailView" style="display: none;">
+                <div class="detail-header">
+                    <div class="detail-title" id="detailTitle">Component Name</div>
+                    <div class="detail-type" id="detailType">service</div>
+                </div>
+                <div class="detail-content">
+                    <!-- PRD Section 1: Overview -->
+                    <div class="prd-section" data-section="overview">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Overview</span>
+                        </div>
+                        <div class="prd-card">
+                            <div class="prd-field">
+                                <label>Problem Statement</label>
+                                <p id="detailProblem">-</p>
+                            </div>
+                            <div class="prd-field">
+                                <label>Summary</label>
+                                <p id="detailSummary">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 2: Scope -->
+                    <div class="prd-section" data-section="scope">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Scope & Boundaries</span>
+                        </div>
+                        <div class="prd-card">
+                            <div class="scope-grid">
+                                <div class="scope-column scope-in">
+                                    <div class="scope-header">IN SCOPE - Build This</div>
+                                    <ul id="detailScopeIn"></ul>
+                                </div>
+                                <div class="scope-column scope-out">
+                                    <div class="scope-header">OUT OF SCOPE - Do NOT Build</div>
+                                    <ul id="detailScopeOut"></ul>
+                                </div>
+                            </div>
+                            <div class="prd-field" style="margin-top: 12px;">
+                                <label>Assumptions</label>
+                                <ul class="assumption-list" id="detailAssumptions"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 3: Interface Contract -->
+                    <div class="prd-section" data-section="interface">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Interface Contract</span>
+                        </div>
+                        <div class="prd-card">
+                            <div class="interface-grid">
+                                <div class="interface-column">
+                                    <div class="interface-header data-in-header">INPUTS (What I Receive)</div>
+                                    <div id="detailInputSchemas"></div>
+                                </div>
+                                <div class="interface-column">
+                                    <div class="interface-header data-out-header">OUTPUTS (What I Produce)</div>
+                                    <div id="detailOutputSchemas"></div>
+                                </div>
+                            </div>
+                            <div class="prd-field" style="margin-top: 12px;">
+                                <label>Public Methods / Endpoints</label>
+                                <div id="detailMethods"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 4: Dependencies -->
+                    <div class="prd-section" data-section="dependencies">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Dependencies & Integration</span>
+                        </div>
+                        <div class="prd-card">
+                            <div id="detailDependencies"></div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 5: Acceptance Criteria -->
+                    <div class="prd-section" data-section="acceptance">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Acceptance Criteria</span>
+                        </div>
+                        <div class="prd-card">
+                            <div class="prd-field">
+                                <label>Functional Requirements (Must Have)</label>
+                                <ul class="acceptance-list" id="detailAcceptance"></ul>
+                            </div>
+                            <div class="prd-field">
+                                <label>Edge Cases to Handle</label>
+                                <ul class="edge-case-list" id="detailEdgeCases"></ul>
+                            </div>
+                            <div class="prd-field">
+                                <label>Error Handling Requirements</label>
+                                <ul class="error-list" id="detailErrorHandling"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 6: Success Metrics -->
+                    <div class="prd-section" data-section="metrics">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Success Metrics</span>
+                        </div>
+                        <div class="prd-card">
+                            <div id="detailMetrics"></div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 7: Implementation Guide - keeps step numbers -->
+                    <div class="prd-section" data-section="implementation">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Implementation Guide</span>
+                        </div>
+                        <div class="prd-card">
+                            <div id="detailSteps"></div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 8: Testing -->
+                    <div class="prd-section" data-section="testing">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Test Cases</span>
+                        </div>
+                        <div class="prd-card">
+                            <div id="detailTestCases"></div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 9: Files -->
+                    <div class="prd-section" data-section="files">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">Files to Create</span>
+                        </div>
+                        <div class="prd-card">
+                            <div id="detailFiles"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="copyPRD()">Copy as PRD</button>
+                    <button class="quick-btn" onclick="startImplementation()">Start Building</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chat Bubble -->
+    <div class="chat-bubble" onclick="toggleChat()" title="Chat with AI">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            <circle cx="8" cy="10" r="1.5"/>
+            <circle cx="12" cy="10" r="1.5"/>
+            <circle cx="16" cy="10" r="1.5"/>
+        </svg>
+    </div>
+
+    <!-- AI Chat Panel -->
+    <div class="chat-panel" id="chatPanel">
+        <div class="chat-header">
+            <div>
+                <div class="chat-header-title">AI Design Assistant</div>
+                <div class="chat-header-subtitle">Refine your component design</div>
+            </div>
+            <button class="chat-close" onclick="toggleChat()">&times;</button>
+        </div>
+        <div class="chat-context" id="chatContext">
+            <strong>Context:</strong> Select a component to discuss
+        </div>
+        <div class="chat-suggestions" id="chatSuggestions">
+            <span class="chat-suggestion" onclick="useSuggestion('Add more edge cases')">Add edge cases</span>
+            <span class="chat-suggestion" onclick="useSuggestion('Simplify the scope')">Simplify scope</span>
+            <span class="chat-suggestion" onclick="useSuggestion('Add input validation')">Add validation</span>
+            <span class="chat-suggestion" onclick="useSuggestion('Improve error handling')">Error handling</span>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-message ai">
+                Hi! I can help you refine your component design. Select a component and ask me to:
+                <br><br>
+                • Add or modify requirements<br>
+                • Suggest edge cases<br>
+                • Improve the interface contract<br>
+                • Clarify scope boundaries
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <div class="chat-input-wrapper">
+                <input type="text" class="chat-input" id="chatInput" placeholder="Ask about this component..." onkeypress="handleChatKeypress(event)">
+                <button class="chat-send" id="chatSend" onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose',
+            flowchart: {
+                nodeSpacing: 80,
+                rankSpacing: 100,
+                curve: 'basis',
+                padding: 20
+            }
+        });
+
+        // State
+        let currentProject = null;
+        let architecture = null;
+        let selectedComponentId = null;
+        let zoomLevel = 1;
+        let panX = 0, panY = 0;
+        let isPanning = false;
+        let startX, startY;
+
+        // Get project ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectId = urlParams.get('project');
+
+        // Initialize
+        if (projectId) {
+            loadArchitecture(projectId);
+        } else {
+            document.getElementById('componentTree').innerHTML = '<div class="empty-state"><h3>No Project</h3><p>Please select a project from the Interview page</p></div>';
+            document.getElementById('mermaid-viewport').innerHTML = '<div class="empty-state"><h3>No Architecture</h3><p>No project selected</p></div>';
+        }
+
+        async function loadArchitecture(projId) {
+            try {
+                // Get project data (includes nodes/components and edges)
+                const response = await fetch(`/api/project/${projId}`);
+                const data = await response.json();
+
+                if (data.status === 'success' && data.data) {
+                    const graphData = data.data;
+                    currentProject = {
+                        name: graphData.projectName,
+                        summary: graphData.projectSummary,
+                        problem: graphData.projectProblem
+                    };
+                    document.getElementById('projectName').textContent = currentProject.name || 'Unnamed Project';
+
+                    // Convert graph data format to architecture format
+                    // nodes -> components, edges stay the same
+                    if (graphData.nodes && graphData.nodes.length > 0) {
+                        architecture = {
+                            components: graphData.nodes.map(n => ({
+                                id: n.id,
+                                label: n.label,
+                                type: n.type || 'service',
+                                summary: n.summary,
+                                problem_statement: n.problem || n.problemStatement,
+                                goals: n.goals || [],
+                                scope: n.scope || [],
+                                requirements: n.requirements || [],
+                                risks: n.risks || [],
+                                inputs: n.inputs || [],
+                                outputs: n.outputs || [],
+                                files: n.files || [],
+                                metrics: n.metrics || [],
+                                test_cases: n.testCases || []
+                            })),
+                            edges: (graphData.edges || []).map(e => ({
+                                from: e.from,
+                                to: e.to,
+                                label: e.label,
+                                type: e.type || 'data'
+                            }))
+                        };
+                        renderArchitecture();
+                    } else {
+                        // No components yet - show option to generate
+                        document.getElementById('componentTree').innerHTML = `
+                            <div class="empty-state">
+                                <h3>No Architecture</h3>
+                                <p>This project doesn't have detailed architecture yet.</p>
+                                <button class="btn btn-primary" onclick="generateArchitecture('${projId}')" style="margin-top: 12px;">Generate Architecture</button>
+                            </div>
+                        `;
+                        document.getElementById('mermaid-viewport').innerHTML = '<div class="empty-state"><h3>No Components</h3><p>Generate architecture to see the diagram</p></div>';
+                    }
+                } else {
+                    showError('Failed to load project');
+                }
+            } catch (err) {
+                console.error('Error loading architecture:', err);
+                showError('Error loading project: ' + err.message);
+            }
+        }
+
+        window.generateArchitecture = async function(projId) {
+            document.getElementById('componentTree').innerHTML = '<div class="loading"><div class="spinner"></div>Generating architecture...</div>';
+            document.getElementById('mermaid-viewport').innerHTML = '<div class="loading"><div class="spinner"></div>Analyzing components...</div>';
+
+            try {
+                const response = await fetch(`/api/projects/${projId}/architecture`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Reload the full project data to get the saved components
+                    await loadArchitecture(projId);
+                } else {
+                    showError('Failed to generate architecture: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Error generating architecture:', err);
+                showError('Error generating architecture: ' + err.message);
+            }
+        };
+
+        window.regenerateArchitecture = async function() {
+            if (projectId && confirm('This will regenerate the architecture. Continue?')) {
+                await generateArchitecture(projectId);
+            }
+        };
+
+        function renderArchitecture() {
+            if (!architecture || !architecture.components) {
+                showError('No architecture data');
+                return;
+            }
+
+            // Update component count
+            document.getElementById('componentCount').textContent = architecture.components.length;
+
+            // Render component tree
+            renderComponentTree();
+
+            // Render Mermaid diagram
+            renderDiagram();
+        }
+
+        function renderComponentTree() {
+            const tree = document.getElementById('componentTree');
+            tree.innerHTML = '';
+
+            // Sort: root first, then by type
+            const sorted = [...architecture.components].sort((a, b) => {
+                if (a.type === 'root') return -1;
+                if (b.type === 'root') return 1;
+                return (a.label || '').localeCompare(b.label || '');
+            });
+
+            sorted.forEach(comp => {
+                const item = document.createElement('div');
+                item.className = `component-item ${comp.type || 'service'}`;
+                item.dataset.id = comp.id;
+
+                const goalsCount = (comp.goals || []).length;
+                const testsCount = (comp.test_cases || []).length;
+                const metricsCount = (comp.metrics || []).length;
+
+                item.innerHTML = `
+                    <div class="component-label">${comp.label || comp.id}</div>
+                    <div class="component-type">${comp.type || 'component'}</div>
+                    <div class="component-stats">
+                        <span>${goalsCount} goals</span>
+                        <span>${testsCount} tests</span>
+                        <span>${metricsCount} metrics</span>
+                    </div>
+                `;
+
+                item.onclick = () => selectComponent(comp.id);
+                tree.appendChild(item);
+            });
+        }
+
+        function selectComponent(compId) {
+            selectedComponentId = compId;
+
+            // Update tree selection
+            document.querySelectorAll('.component-item').forEach(el => {
+                el.classList.toggle('selected', el.dataset.id === compId);
+            });
+
+            // Show detail view
+            const comp = architecture.components.find(c => c.id === compId);
+            if (comp) {
+                showComponentDetail(comp);
+            }
+        }
+
+        function showComponentDetail(comp) {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('detailView').style.display = 'flex';
+            document.getElementById('detailView').style.flexDirection = 'column';
+
+            // Store for PRD export
+            window.currentPRDComponent = comp;
+
+            document.getElementById('detailTitle').textContent = comp.label || comp.id;
+            document.getElementById('detailType').textContent = comp.type || 'component';
+
+            // === SECTION 1: Overview ===
+            document.getElementById('detailProblem').textContent = comp.problem_statement || 'Define the specific problem this component solves';
+            document.getElementById('detailSummary').textContent = comp.summary || (comp.goals || [])[0] || 'Component summary not defined';
+
+            // === SECTION 2: Scope & Boundaries ===
+            const scopeData = generateScope(comp);
+            document.getElementById('detailScopeIn').innerHTML = scopeData.inScope.map(s => `<li>${s}</li>`).join('');
+            document.getElementById('detailScopeOut').innerHTML = scopeData.outOfScope.map(s => `<li>${s}</li>`).join('');
+            document.getElementById('detailAssumptions').innerHTML = scopeData.assumptions.map(a => `<li>${a}</li>`).join('');
+
+            // === SECTION 3: Interface Contract ===
+            const inputSchemas = generateInputSchemas(comp);
+            const outputSchemas = generateOutputSchemas(comp);
+            const methods = generateMethods(comp);
+
+            document.getElementById('detailInputSchemas').innerHTML = inputSchemas.map(s => `
+                <div class="schema-item">
+                    <span class="schema-name">${s.name}</span>: <span class="schema-type">${s.type}</span>
+                    ${s.required ? ' <span style="color: #ef4444; font-size: 9px;">(required)</span>' : ''}
+                    <div class="schema-desc">${s.description}</div>
+                </div>
+            `).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No inputs defined</p>';
+
+            document.getElementById('detailOutputSchemas').innerHTML = outputSchemas.map(s => `
+                <div class="schema-item">
+                    <span class="schema-name">${s.name}</span>: <span class="schema-type">${s.type}</span>
+                    <div class="schema-desc">${s.description}</div>
+                </div>
+            `).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No outputs defined</p>';
+
+            document.getElementById('detailMethods').innerHTML = methods.map(m => `
+                <div class="method-card">
+                    <div class="method-signature">${m.signature}</div>
+                    <div class="method-desc">${m.description}</div>
+                    <div class="method-params">
+                        ${m.params.map(p => `<code>${p}</code>`).join(' ')}
+                        ${m.returns ? `→ <code>${m.returns}</code>` : ''}
+                    </div>
+                </div>
+            `).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No methods defined</p>';
+
+            // === SECTION 4: Dependencies ===
+            const depsDiv = document.getElementById('detailDependencies');
+            const deps = findComponentDependencies(comp.id);
+            let depsHtml = '';
+
+            if (deps.dependsOn.length > 0) {
+                depsHtml += '<div class="prd-field"><label>Upstream Dependencies (I need these)</label>';
+                depsHtml += deps.dependsOn.map(d => {
+                    const depComp = architecture.components.find(c => c.id === d.id);
+                    return `<div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                        <div style="font-weight: 600; color: #a855f7; font-size: 12px;">${d.label}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Provides: ${(depComp?.outputs || ['data']).slice(0, 2).join(', ')}</div>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Connection type: ${d.type}</div>
+                    </div>`;
+                }).join('');
+                depsHtml += '</div>';
+            }
+
+            if (deps.dependedBy.length > 0) {
+                depsHtml += '<div class="prd-field"><label>Downstream Consumers (These need me)</label>';
+                depsHtml += deps.dependedBy.map(d => {
+                    const depComp = architecture.components.find(c => c.id === d.id);
+                    return `<div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                        <div style="font-weight: 600; color: #22c55e; font-size: 12px;">${d.label}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Expects: ${(depComp?.inputs || ['data']).slice(0, 2).join(', ')}</div>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Connection type: ${d.type}</div>
+                    </div>`;
+                }).join('');
+                depsHtml += '</div>';
+            }
+
+            if (!depsHtml) {
+                depsHtml = '<p style="color: var(--text-muted); font-size: 12px;">This component is standalone with no dependencies.</p>';
+            }
+            depsDiv.innerHTML = depsHtml;
+
+            // === SECTION 5: Acceptance Criteria ===
+            const acceptance = generateAcceptanceCriteria(comp);
+            document.getElementById('detailAcceptance').innerHTML = acceptance.criteria.map(c => `<li>${c}</li>`).join('');
+            document.getElementById('detailEdgeCases').innerHTML = acceptance.edgeCases.map(e => `<li>${e}</li>`).join('');
+            document.getElementById('detailErrorHandling').innerHTML = acceptance.errorHandling.map(e => `<li>${e}</li>`).join('');
+
+            // === SECTION 6: Success Metrics ===
+            const metricsDiv = document.getElementById('detailMetrics');
+            const metrics = generateSuccessMetrics(comp);
+            metricsDiv.innerHTML = metrics.map(m => `
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-name">${m.name}</span>
+                        <span class="status-badge status-${m.status || 'pending'}">${m.status || 'pending'}</span>
+                    </div>
+                    <div class="metric-target">Target: ${m.target}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${m.description}</div>
+                </div>
+            `).join('');
+
+            // === SECTION 7: Implementation Guide ===
+            const stepsDiv = document.getElementById('detailSteps');
+            const steps = generateImplementationSteps(comp);
+            stepsDiv.innerHTML = steps.map((step, i) => `
+                <div class="impl-step">
+                    <div class="step-number">${i + 1}</div>
+                    <div class="step-content">
+                        <div class="step-title">${step.title}</div>
+                        <div class="step-desc">${step.description}</div>
+                        ${step.how && step.how.length > 0 ? `
+                            <div class="step-how">
+                                <div class="how-label">How:</div>
+                                <ul class="how-list">
+                                    ${step.how.map(h => `<li>${h}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        <div class="step-data-flow">
+                            <div class="data-flow-item data-in">
+                                <span class="flow-label">IN:</span>
+                                <span class="flow-value">${step.dataIn || 'None'}</span>
+                            </div>
+                            <div class="data-flow-arrow">→</div>
+                            <div class="data-flow-item data-out">
+                                <span class="flow-label">OUT:</span>
+                                <span class="flow-value">${step.dataOut || 'None'}</span>
+                            </div>
+                        </div>
+                        ${step.files && step.files.length > 0 ? `
+                            <div class="step-files">
+                                ${step.files.map(f => `<span class="step-file">${f}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('') || '<p style="color: var(--text-muted); font-size: 13px;">No implementation steps defined</p>';
+
+            // === SECTION 8: Test Cases ===
+            const testsDiv = document.getElementById('detailTestCases');
+            const testCases = generateTestCases(comp);
+            testsDiv.innerHTML = testCases.map(t => `
+                <div class="test-card">
+                    <div class="test-header">
+                        <span class="test-name">${t.name}</span>
+                        <span class="status-badge status-${t.status || 'pending'}">${t.status || 'pending'}</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${t.description}</div>
+                    ${t.input ? `<div style="font-size: 11px; margin-top: 4px;"><strong>Given:</strong> ${t.input}</div>` : ''}
+                    ${t.expected ? `<div style="font-size: 11px;"><strong>Expect:</strong> ${t.expected}</div>` : ''}
+                </div>
+            `).join('') || '<p style="color: var(--text-muted); font-size: 13px;">No test cases defined</p>';
+
+            // === SECTION 9: Files ===
+            const filesDiv = document.getElementById('detailFiles');
+            const filesList = generateFileList(comp);
+            filesDiv.innerHTML = filesList.map(f => `
+                <div class="file-item">
+                    <span class="file-icon">${f.icon}</span>
+                    <span class="file-path">${f.path}</span>
+                    <span class="file-purpose">${f.purpose}</span>
+                </div>
+            `).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No files specified</p>';
+        }
+
+        // === PRD Generator Functions ===
+
+        function generateScope(comp) {
+            const inScope = [];
+            const outOfScope = [];
+            const assumptions = [];
+
+            // In scope from goals
+            (comp.goals || []).forEach(g => {
+                inScope.push(g);
+            });
+
+            // In scope from requirements
+            (comp.requirements || []).forEach(r => {
+                if (!inScope.some(s => s.includes(r.substring(0, 20)))) {
+                    inScope.push(r);
+                }
+            });
+
+            // Generate out-of-scope based on component type
+            const typeExclusions = {
+                'data': [
+                    'Business logic processing',
+                    'User authentication/authorization',
+                    'API endpoint definitions',
+                    'Frontend rendering'
+                ],
+                'api': [
+                    'Database schema design',
+                    'Business logic implementation',
+                    'Frontend UI components',
+                    'Background job processing'
+                ],
+                'ui': [
+                    'Backend API implementation',
+                    'Database operations',
+                    'Authentication logic',
+                    'Data validation beyond input formatting'
+                ],
+                'service': [
+                    'Direct database access (use data layer)',
+                    'HTTP request handling (use API layer)',
+                    'UI rendering',
+                    'External API calls (use integration layer)'
+                ],
+                'security': [
+                    'Business logic',
+                    'Data storage',
+                    'UI components',
+                    'External integrations'
+                ],
+                'integration': [
+                    'Internal business logic',
+                    'User authentication',
+                    'Data storage',
+                    'UI components'
+                ]
+            };
+
+            outOfScope.push(...(typeExclusions[comp.type] || typeExclusions['service']));
+
+            // Assumptions based on dependencies
+            const deps = findComponentDependencies(comp.id);
+            if (deps.dependsOn.length > 0) {
+                deps.dependsOn.forEach(d => {
+                    assumptions.push(`${d.label} is available and functioning correctly`);
+                });
+            }
+
+            // Type-based assumptions
+            const typeAssumptions = {
+                'data': ['Database connection is configured', 'Schema migrations are run'],
+                'api': ['Server framework is initialized', 'Authentication middleware is in place'],
+                'ui': ['Component framework is set up', 'Styling system is configured'],
+                'service': ['Dependency injection is configured', 'Logging is available'],
+                'security': ['Crypto libraries are available', 'Secure storage is configured'],
+                'integration': ['Network access is available', 'API credentials are configured']
+            };
+            assumptions.push(...(typeAssumptions[comp.type] || typeAssumptions['service']));
+
+            return { inScope, outOfScope, assumptions };
+        }
+
+        function generateInputSchemas(comp) {
+            const schemas = [];
+            const inputs = comp.inputs || [];
+
+            inputs.forEach(input => {
+                // Parse input to extract type info if possible
+                const schema = {
+                    name: input.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),
+                    type: inferType(input),
+                    description: input,
+                    required: true
+                };
+                schemas.push(schema);
+            });
+
+            // Add type-specific inputs
+            if (comp.type === 'api' && schemas.length === 0) {
+                schemas.push(
+                    { name: 'request', type: 'HTTPRequest', description: 'Incoming HTTP request object', required: true },
+                    { name: 'params', type: 'Object', description: 'URL and query parameters', required: false }
+                );
+            } else if (comp.type === 'ui' && schemas.length === 0) {
+                schemas.push(
+                    { name: 'props', type: 'Object', description: 'Component properties from parent', required: true },
+                    { name: 'state', type: 'Object', description: 'Local component state', required: false }
+                );
+            }
+
+            return schemas;
+        }
+
+        function generateOutputSchemas(comp) {
+            const schemas = [];
+            const outputs = comp.outputs || [];
+
+            outputs.forEach(output => {
+                const schema = {
+                    name: output.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),
+                    type: inferType(output),
+                    description: output
+                };
+                schemas.push(schema);
+            });
+
+            // Add type-specific outputs
+            if (comp.type === 'api' && schemas.length === 0) {
+                schemas.push(
+                    { name: 'response', type: 'HTTPResponse', description: 'JSON response with status and data' },
+                    { name: 'error', type: 'ErrorResponse', description: 'Error object if request fails' }
+                );
+            } else if (comp.type === 'data' && schemas.length === 0) {
+                schemas.push(
+                    { name: 'result', type: 'QueryResult', description: 'Database query result set' },
+                    { name: 'affected', type: 'number', description: 'Number of affected rows' }
+                );
+            }
+
+            return schemas;
+        }
+
+        function inferType(text) {
+            const lower = text.toLowerCase();
+            if (lower.includes('list') || lower.includes('array') || lower.includes('collection')) return 'Array';
+            if (lower.includes('id') || lower.includes('count') || lower.includes('number')) return 'number';
+            if (lower.includes('flag') || lower.includes('is_') || lower.includes('has_')) return 'boolean';
+            if (lower.includes('date') || lower.includes('time')) return 'Date';
+            if (lower.includes('config') || lower.includes('options') || lower.includes('settings')) return 'Object';
+            if (lower.includes('name') || lower.includes('text') || lower.includes('message')) return 'string';
+            return 'Object';
+        }
+
+        function generateMethods(comp) {
+            const methods = [];
+            const goals = comp.goals || [];
+            const type = comp.type || 'service';
+
+            // Generate methods based on goals
+            goals.slice(0, 4).forEach(goal => {
+                const methodName = goalToMethodName(goal);
+                methods.push({
+                    signature: `${methodName}(${getMethodParams(goal, type)})`,
+                    description: goal,
+                    params: getMethodParamsList(goal, type),
+                    returns: getMethodReturn(goal, type)
+                });
+            });
+
+            // Add type-specific default methods
+            if (methods.length === 0) {
+                const typeMethods = {
+                    'data': [
+                        { signature: 'create(data)', description: 'Create a new record', params: ['data: Object'], returns: 'Record' },
+                        { signature: 'read(id)', description: 'Read a record by ID', params: ['id: string'], returns: 'Record | null' },
+                        { signature: 'update(id, data)', description: 'Update an existing record', params: ['id: string', 'data: Object'], returns: 'Record' },
+                        { signature: 'delete(id)', description: 'Delete a record', params: ['id: string'], returns: 'boolean' }
+                    ],
+                    'api': [
+                        { signature: 'GET /', description: 'List all resources', params: ['query: Object'], returns: 'Array<Resource>' },
+                        { signature: 'POST /', description: 'Create a new resource', params: ['body: Object'], returns: 'Resource' },
+                        { signature: 'GET /:id', description: 'Get a single resource', params: ['id: string'], returns: 'Resource' },
+                        { signature: 'PUT /:id', description: 'Update a resource', params: ['id: string', 'body: Object'], returns: 'Resource' }
+                    ],
+                    'ui': [
+                        { signature: 'render()', description: 'Render the component', params: [], returns: 'JSX.Element' },
+                        { signature: 'handleSubmit(event)', description: 'Handle form submission', params: ['event: Event'], returns: 'void' },
+                        { signature: 'onChange(value)', description: 'Handle input changes', params: ['value: any'], returns: 'void' }
+                    ]
+                };
+                methods.push(...(typeMethods[type] || typeMethods['data'].slice(0, 2)));
+            }
+
+            return methods;
+        }
+
+        function goalToMethodName(goal) {
+            const words = goal.toLowerCase().split(/\s+/).slice(0, 3);
+            const actionWords = ['create', 'get', 'update', 'delete', 'fetch', 'save', 'load', 'process', 'validate', 'handle', 'send', 'receive'];
+            const action = words.find(w => actionWords.includes(w)) || words[0];
+            const subject = words.find(w => !actionWords.includes(w) && w.length > 3) || 'data';
+            return action + subject.charAt(0).toUpperCase() + subject.slice(1);
+        }
+
+        function getMethodParams(goal, type) {
+            const lower = goal.toLowerCase();
+            if (lower.includes('create') || lower.includes('save')) return 'data: Object';
+            if (lower.includes('update')) return 'id: string, data: Object';
+            if (lower.includes('delete') || lower.includes('get') || lower.includes('fetch')) return 'id: string';
+            if (lower.includes('list') || lower.includes('search')) return 'query?: Object';
+            return 'input: any';
+        }
+
+        function getMethodParamsList(goal, type) {
+            const params = getMethodParams(goal, type);
+            return params.split(',').map(p => p.trim());
+        }
+
+        function getMethodReturn(goal, type) {
+            const lower = goal.toLowerCase();
+            if (lower.includes('list') || lower.includes('search') || lower.includes('all')) return 'Array';
+            if (lower.includes('delete')) return 'boolean';
+            if (lower.includes('validate') || lower.includes('check')) return 'ValidationResult';
+            if (lower.includes('count')) return 'number';
+            return 'Object';
+        }
+
+        function generateAcceptanceCriteria(comp) {
+            const criteria = [];
+            const edgeCases = [];
+            const errorHandling = [];
+
+            // Convert goals to acceptance criteria
+            (comp.goals || []).forEach(goal => {
+                criteria.push(`GIVEN valid input, WHEN ${goal.toLowerCase()}, THEN operation completes successfully`);
+            });
+
+            // Convert requirements to criteria
+            (comp.requirements || []).forEach(req => {
+                if (!criteria.some(c => c.includes(req.substring(0, 20)))) {
+                    criteria.push(req);
+                }
+            });
+
+            // Type-specific edge cases
+            const typeEdgeCases = {
+                'data': [
+                    'Empty dataset queries',
+                    'Null or undefined field values',
+                    'Duplicate key constraints',
+                    'Large batch operations (1000+ records)',
+                    'Concurrent read/write operations'
+                ],
+                'api': [
+                    'Missing required fields in request',
+                    'Invalid data types in payload',
+                    'Unauthorized access attempts',
+                    'Rate limit exceeded',
+                    'Request timeout scenarios'
+                ],
+                'ui': [
+                    'Empty state (no data)',
+                    'Loading state',
+                    'Error state display',
+                    'Form validation failures',
+                    'Rapid user input (debouncing)'
+                ],
+                'service': [
+                    'Null/undefined input parameters',
+                    'Dependency service unavailable',
+                    'Partial success scenarios',
+                    'Concurrent operation conflicts',
+                    'Data consistency edge cases'
+                ],
+                'security': [
+                    'Expired tokens/sessions',
+                    'Invalid credentials',
+                    'Privilege escalation attempts',
+                    'Brute force attempts',
+                    'Token refresh during request'
+                ],
+                'integration': [
+                    'External service timeout',
+                    'Invalid response format',
+                    'Rate limiting from external API',
+                    'Partial data responses',
+                    'Network connection failures'
+                ]
+            };
+            edgeCases.push(...(typeEdgeCases[comp.type] || typeEdgeCases['service']));
+
+            // Error handling requirements
+            const typeErrors = {
+                'data': [
+                    'Return clear error for constraint violations',
+                    'Handle connection failures gracefully',
+                    'Log all database errors with context',
+                    'Rollback transactions on partial failure'
+                ],
+                'api': [
+                    'Return appropriate HTTP status codes',
+                    'Include error details in response body',
+                    'Never expose internal error details',
+                    'Log request context with errors'
+                ],
+                'ui': [
+                    'Display user-friendly error messages',
+                    'Provide retry options where applicable',
+                    'Maintain form state on validation errors',
+                    'Show loading indicators during operations'
+                ],
+                'service': [
+                    'Throw typed exceptions for different errors',
+                    'Include error context for debugging',
+                    'Handle partial failures appropriately',
+                    'Implement circuit breaker for dependencies'
+                ],
+                'security': [
+                    'Never reveal whether user exists on auth failure',
+                    'Lock accounts after repeated failures',
+                    'Log all authentication attempts',
+                    'Clear sensitive data on session end'
+                ],
+                'integration': [
+                    'Implement retry with exponential backoff',
+                    'Cache last successful response as fallback',
+                    'Alert on repeated external failures',
+                    'Gracefully degrade when external service is down'
+                ]
+            };
+            errorHandling.push(...(typeErrors[comp.type] || typeErrors['service']));
+
+            return { criteria, edgeCases, errorHandling };
+        }
+
+        function generateTestCases(comp) {
+            // Use existing test cases if available
+            if (comp.test_cases && comp.test_cases.length > 0) {
+                return comp.test_cases.map(t => ({
+                    name: t.name,
+                    description: t.description || '',
+                    status: t.status || 'pending',
+                    input: t.input || null,
+                    expected: t.expected || null
+                }));
+            }
+
+            // Generate test cases from goals
+            const tests = [];
+            const goals = comp.goals || [];
+            const type = comp.type || 'service';
+
+            goals.slice(0, 3).forEach((goal, i) => {
+                tests.push({
+                    name: `Unit: ${goal.substring(0, 40)}...`,
+                    description: `Verify that component correctly ${goal.toLowerCase()}`,
+                    status: 'pending',
+                    input: 'Valid input data',
+                    expected: 'Operation completes successfully'
+                });
+            });
+
+            // Add edge case tests
+            tests.push({
+                name: 'Edge: Handle empty input',
+                description: 'Component handles empty/null input gracefully',
+                status: 'pending',
+                input: 'null or empty object',
+                expected: 'Returns appropriate error or default'
+            });
+
+            tests.push({
+                name: 'Edge: Handle invalid input',
+                description: 'Component rejects malformed input',
+                status: 'pending',
+                input: 'Invalid data type or format',
+                expected: 'Throws validation error'
+            });
+
+            // Type-specific tests
+            if (type === 'api') {
+                tests.push({
+                    name: 'Integration: Auth required',
+                    description: 'Endpoints reject unauthorized requests',
+                    status: 'pending',
+                    input: 'Request without auth token',
+                    expected: '401 Unauthorized response'
+                });
+            } else if (type === 'data') {
+                tests.push({
+                    name: 'Integration: Transaction rollback',
+                    description: 'Failed operations rollback correctly',
+                    status: 'pending',
+                    input: 'Operation that fails mid-transaction',
+                    expected: 'No partial data written'
+                });
+            }
+
+            return tests;
+        }
+
+        function generateFileList(comp) {
+            const files = [];
+            const existingFiles = comp.files || [];
+
+            // Process existing files
+            existingFiles.forEach(f => {
+                const path = typeof f === 'string' ? f : (f.path || f.name);
+                files.push({
+                    path: path,
+                    icon: getFileIcon(path),
+                    purpose: inferFilePurpose(path, comp.type)
+                });
+            });
+
+            // Generate suggested files if none exist
+            if (files.length === 0) {
+                const label = (comp.label || comp.id).toLowerCase().replace(/\s+/g, '_');
+                const typeFiles = {
+                    'data': [
+                        { path: `models/${label}.py`, purpose: 'Data model definition' },
+                        { path: `migrations/${label}_001.sql`, purpose: 'Schema migration' },
+                        { path: `tests/test_${label}_model.py`, purpose: 'Model unit tests' }
+                    ],
+                    'api': [
+                        { path: `api/routes/${label}.py`, purpose: 'API endpoints' },
+                        { path: `api/schemas/${label}.py`, purpose: 'Request/response schemas' },
+                        { path: `tests/test_${label}_api.py`, purpose: 'API integration tests' }
+                    ],
+                    'ui': [
+                        { path: `components/${label}.jsx`, purpose: 'Main component' },
+                        { path: `components/${label}.css`, purpose: 'Component styles' },
+                        { path: `tests/${label}.test.js`, purpose: 'Component tests' }
+                    ],
+                    'service': [
+                        { path: `services/${label}.py`, purpose: 'Service implementation' },
+                        { path: `services/${label}_interface.py`, purpose: 'Service interface' },
+                        { path: `tests/test_${label}_service.py`, purpose: 'Service unit tests' }
+                    ],
+                    'security': [
+                        { path: `auth/${label}.py`, purpose: 'Auth implementation' },
+                        { path: `middleware/${label}_middleware.py`, purpose: 'Auth middleware' },
+                        { path: `tests/test_${label}_auth.py`, purpose: 'Security tests' }
+                    ],
+                    'integration': [
+                        { path: `integrations/${label}_client.py`, purpose: 'External API client' },
+                        { path: `integrations/${label}_models.py`, purpose: 'External data models' },
+                        { path: `tests/test_${label}_integration.py`, purpose: 'Integration tests' }
+                    ]
+                };
+                files.push(...(typeFiles[comp.type] || typeFiles['service']).map(f => ({ ...f, icon: getFileIcon(f.path) })));
+            }
+
+            return files;
+        }
+
+        function getFileIcon(path) {
+            if (path.endsWith('.py')) return '🐍';
+            if (path.endsWith('.js') || path.endsWith('.jsx')) return '📜';
+            if (path.endsWith('.ts') || path.endsWith('.tsx')) return '📘';
+            if (path.endsWith('.css') || path.endsWith('.scss')) return '🎨';
+            if (path.endsWith('.html')) return '🌐';
+            if (path.endsWith('.sql')) return '🗄️';
+            if (path.endsWith('.json')) return '📋';
+            if (path.includes('test')) return '🧪';
+            return '📄';
+        }
+
+        function inferFilePurpose(path, type) {
+            if (path.includes('test')) return 'Test file';
+            if (path.includes('model')) return 'Data model';
+            if (path.includes('route') || path.includes('api')) return 'API endpoint';
+            if (path.includes('schema')) return 'Data schema';
+            if (path.includes('migration')) return 'Database migration';
+            if (path.includes('component')) return 'UI component';
+            if (path.includes('service')) return 'Business logic';
+            if (path.includes('middleware')) return 'Middleware';
+            if (path.endsWith('.css')) return 'Styles';
+            return 'Implementation';
+        }
+
+        // Copy PRD to clipboard
+        window.copyPRD = function() {
+            const comp = window.currentPRDComponent;
+            if (!comp) return;
+
+            const deps = findComponentDependencies(comp.id);
+            const scope = generateScope(comp);
+            const acceptance = generateAcceptanceCriteria(comp);
+            const methods = generateMethods(comp);
+            const tests = generateTestCases(comp);
+            const files = generateFileList(comp);
+
+            const prd = `# PRD: ${comp.label || comp.id}
+Type: ${comp.type || 'service'}
+
+## 1. Overview
+
+**Problem Statement:**
+${comp.problem_statement || comp.summary || 'Not defined'}
+
+**Summary:**
+${comp.summary || (comp.goals || [])[0] || 'Not defined'}
+
+## 2. Scope & Boundaries
+
+### In Scope (Build This)
+${scope.inScope.map(s => `- ${s}`).join('\n')}
+
+### Out of Scope (Do NOT Build)
+${scope.outOfScope.map(s => `- ${s}`).join('\n')}
+
+### Assumptions
+${scope.assumptions.map(a => `- ${a}`).join('\n')}
+
+## 3. Interface Contract
+
+### Inputs
+${(comp.inputs || []).map(i => `- ${i}`).join('\n') || '- None specified'}
+
+### Outputs
+${(comp.outputs || []).map(o => `- ${o}`).join('\n') || '- None specified'}
+
+### Public Methods/Endpoints
+${methods.map(m => `- \`${m.signature}\`: ${m.description}`).join('\n')}
+
+## 4. Dependencies
+
+### Upstream (I need these)
+${deps.dependsOn.length > 0 ? deps.dependsOn.map(d => `- ${d.label} (${d.type})`).join('\n') : '- None'}
+
+### Downstream (These need me)
+${deps.dependedBy.length > 0 ? deps.dependedBy.map(d => `- ${d.label} (${d.type})`).join('\n') : '- None'}
+
+## 5. Acceptance Criteria
+
+### Functional Requirements
+${acceptance.criteria.map(c => `- [ ] ${c}`).join('\n')}
+
+### Edge Cases to Handle
+${acceptance.edgeCases.map(e => `- ${e}`).join('\n')}
+
+### Error Handling
+${acceptance.errorHandling.map(e => `- ${e}`).join('\n')}
+
+## 6. Test Cases
+${tests.map(t => `- [ ] **${t.name}**: ${t.description}`).join('\n')}
+
+## 7. Files to Create
+${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
+`;
+
+            navigator.clipboard.writeText(prd).then(() => {
+                alert('PRD copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                // Fallback: show in console
+                console.log(prd);
+                alert('PRD logged to console (clipboard failed)');
+            });
+        };
+
+        function generateImplementationSteps(comp) {
+            const steps = [];
+            const files = comp.files || [];
+            const inputs = comp.inputs || [];
+            const outputs = comp.outputs || [];
+            const deps = findComponentDependencies(comp.id);
+
+            // Helper to format data items
+            const formatDataList = (items, max = 3) => {
+                if (!items || items.length === 0) return 'None specified';
+                const truncated = items.slice(0, max);
+                return truncated.join(', ') + (items.length > max ? ` (+${items.length - max} more)` : '');
+            };
+
+            // Step 1: Setup/scaffolding based on type - with specifics
+            if (comp.type === 'data') {
+                steps.push({
+                    title: 'Design Data Schema',
+                    description: 'Define data models with field types, constraints, and indexes. Create migration scripts if needed.',
+                    how: [
+                        'Identify all entities and their attributes from requirements',
+                        'Define primary keys, foreign keys, and relationships',
+                        'Add validation rules and default values',
+                        'Create database indexes for frequently queried fields'
+                    ],
+                    dataIn: 'Schema requirements from architecture spec',
+                    dataOut: 'ORM models, migration files, type definitions',
+                    files: files.filter(f => f.includes('model') || f.includes('schema'))
+                });
+            } else if (comp.type === 'api') {
+                steps.push({
+                    title: 'Define API Contract',
+                    description: 'Specify endpoints, HTTP methods, request/response schemas, and error codes.',
+                    how: [
+                        'Define route paths and HTTP methods (GET, POST, PUT, DELETE)',
+                        'Document request body schema with required/optional fields',
+                        'Specify response format and status codes',
+                        'Define authentication requirements per endpoint'
+                    ],
+                    dataIn: formatDataList(inputs),
+                    dataOut: formatDataList(outputs),
+                    files: files.filter(f => f.includes('route') || f.includes('api'))
+                });
+            } else if (comp.type === 'ui') {
+                steps.push({
+                    title: 'Design Component Structure',
+                    description: 'Plan the UI hierarchy, state management, and user interaction flows.',
+                    how: [
+                        'Create wireframe/mockup of the visual layout',
+                        'Identify reusable sub-components',
+                        'Define component props and local state',
+                        'Map user actions to event handlers'
+                    ],
+                    dataIn: 'User input events, API responses, props from parent',
+                    dataOut: 'Rendered HTML/DOM, user action callbacks, state updates',
+                    files: files.filter(f => f.includes('.html') || f.includes('.jsx') || f.includes('.vue'))
+                });
+            } else if (comp.type === 'security') {
+                steps.push({
+                    title: 'Define Security Model',
+                    description: 'Establish authentication method, authorization rules, and data protection strategy.',
+                    how: [
+                        'Choose auth mechanism (JWT, session, OAuth)',
+                        'Define user roles and permission matrix',
+                        'Identify sensitive data requiring encryption',
+                        'Plan token/session lifecycle and refresh strategy'
+                    ],
+                    dataIn: 'Credentials, tokens, permission requests',
+                    dataOut: 'Auth tokens, session data, access decisions (allow/deny)',
+                    files: files.filter(f => f.includes('auth') || f.includes('security'))
+                });
+            } else if (comp.type === 'integration') {
+                steps.push({
+                    title: 'Map External Interface',
+                    description: 'Document the external API/service contract and data transformation needs.',
+                    how: [
+                        'Review external API documentation',
+                        'Define request/response mapping to internal formats',
+                        'Plan error handling for external failures',
+                        'Set up retry logic and circuit breakers'
+                    ],
+                    dataIn: 'Internal requests, configuration, credentials',
+                    dataOut: 'Transformed external data, status/health info',
+                    files: files.filter(f => f.includes('client') || f.includes('integration'))
+                });
+            } else {
+                steps.push({
+                    title: 'Define Service Interface',
+                    description: 'Establish the public methods, input parameters, and return types for this service.',
+                    how: [
+                        'List all public methods this service will expose',
+                        'Define input parameter types and validation rules',
+                        'Specify return types and error conditions',
+                        'Document any side effects (DB writes, events emitted)'
+                    ],
+                    dataIn: formatDataList(inputs),
+                    dataOut: formatDataList(outputs),
+                    files: files.slice(0, 2)
+                });
+            }
+
+            // Step 2: Handle incoming data connections
+            if (deps.dependsOn.length > 0 || inputs.length > 0) {
+                steps.push({
+                    title: 'Implement Data Ingestion',
+                    description: `Set up handlers for incoming data from ${deps.dependsOn.length} upstream dependencies.`,
+                    how: [
+                        deps.dependsOn.length > 0 ? `Connect to: ${deps.dependsOn.map(d => d.label).join(', ')}` : null,
+                        'Validate incoming data against expected schema',
+                        'Transform external formats to internal representation',
+                        'Handle missing/malformed data gracefully'
+                    ].filter(Boolean),
+                    dataIn: formatDataList(inputs),
+                    dataOut: 'Validated, normalized internal data objects',
+                    files: []
+                });
+            }
+
+            // Step 3: Implement core logic based on goals
+            (comp.goals || []).slice(0, 3).forEach((goal, i) => {
+                // Generate specific how-to based on goal content
+                const howSteps = generateHowStepsFromGoal(goal, comp.type);
+                steps.push({
+                    title: `Core Logic: ${goal.substring(0, 45)}${goal.length > 45 ? '...' : ''}`,
+                    description: goal,
+                    how: howSteps,
+                    dataIn: i === 0 ? formatDataList(inputs) : 'Output from previous step',
+                    dataOut: i === (comp.goals || []).slice(0, 3).length - 1 ? formatDataList(outputs) : 'Processed data for next step',
+                    files: []
+                });
+            });
+
+            // Step 4: Handle outgoing data connections
+            if (deps.dependedBy.length > 0 || outputs.length > 0) {
+                steps.push({
+                    title: 'Implement Data Output',
+                    description: `Format and emit data to ${deps.dependedBy.length} downstream consumers.`,
+                    how: [
+                        'Transform internal data to output format',
+                        deps.dependedBy.length > 0 ? `Emit to: ${deps.dependedBy.map(d => d.label).join(', ')}` : null,
+                        'Add metadata (timestamps, versions, checksums)',
+                        'Implement output validation before sending'
+                    ].filter(Boolean),
+                    dataIn: 'Processed internal data',
+                    dataOut: formatDataList(outputs),
+                    files: []
+                });
+            }
+
+            // Step 5: Error handling and edge cases
+            steps.push({
+                title: 'Implement Error Handling',
+                description: 'Add robust error handling, logging, and recovery mechanisms.',
+                how: [
+                    'Define custom error types for this component',
+                    'Add try/catch blocks around external calls',
+                    'Implement graceful degradation for partial failures',
+                    'Add structured logging for debugging'
+                ],
+                dataIn: 'Exceptions, error states, invalid inputs',
+                dataOut: 'Error responses, log entries, alerts',
+                files: []
+            });
+
+            // Step 6: Testing
+            steps.push({
+                title: 'Write Comprehensive Tests',
+                description: 'Create unit tests, integration tests, and edge case coverage.',
+                how: [
+                    'Unit test each public method with valid inputs',
+                    'Test error paths and invalid input handling',
+                    'Integration test with mocked dependencies',
+                    'Test data flow: input transformation → processing → output'
+                ],
+                dataIn: 'Test fixtures, mock data, edge cases',
+                dataOut: 'Test results, coverage reports',
+                files: files.filter(f => f.includes('test'))
+            });
+
+            return steps;
+        }
+
+        function generateHowStepsFromGoal(goal, compType) {
+            const goalLower = goal.toLowerCase();
+            const steps = [];
+
+            // Analyze goal keywords to generate specific how-to steps
+            if (goalLower.includes('store') || goalLower.includes('save') || goalLower.includes('persist')) {
+                steps.push('Create data model with appropriate fields');
+                steps.push('Implement save/update methods with validation');
+                steps.push('Add indexing for query performance');
+            } else if (goalLower.includes('retrieve') || goalLower.includes('fetch') || goalLower.includes('get') || goalLower.includes('load')) {
+                steps.push('Implement query methods with filtering options');
+                steps.push('Add pagination for large result sets');
+                steps.push('Cache frequently accessed data');
+            } else if (goalLower.includes('validate') || goalLower.includes('verify') || goalLower.includes('check')) {
+                steps.push('Define validation rules and constraints');
+                steps.push('Implement validation function with detailed errors');
+                steps.push('Add both client-side and server-side validation');
+            } else if (goalLower.includes('transform') || goalLower.includes('convert') || goalLower.includes('process')) {
+                steps.push('Map input fields to output structure');
+                steps.push('Handle type conversions and formatting');
+                steps.push('Validate output matches expected schema');
+            } else if (goalLower.includes('display') || goalLower.includes('show') || goalLower.includes('render')) {
+                steps.push('Create template/component structure');
+                steps.push('Bind data to UI elements');
+                steps.push('Add loading and error states');
+            } else if (goalLower.includes('send') || goalLower.includes('notify') || goalLower.includes('emit')) {
+                steps.push('Format message/event payload');
+                steps.push('Implement delivery mechanism');
+                steps.push('Add retry logic for failed deliveries');
+            } else if (goalLower.includes('authenticate') || goalLower.includes('authorize') || goalLower.includes('permission')) {
+                steps.push('Implement credential verification');
+                steps.push('Check permissions against resource');
+                steps.push('Return appropriate access token or denial');
+            } else {
+                // Generic steps based on component type
+                if (compType === 'service') {
+                    steps.push('Parse and validate input parameters');
+                    steps.push('Execute core business logic');
+                    steps.push('Format and return result');
+                } else if (compType === 'api') {
+                    steps.push('Extract data from request');
+                    steps.push('Call appropriate service method');
+                    steps.push('Format HTTP response');
+                } else {
+                    steps.push('Implement the core functionality');
+                    steps.push('Handle edge cases');
+                    steps.push('Validate results before returning');
+                }
+            }
+
+            return steps;
+        }
+
+        function generateSuccessMetrics(comp) {
+            // If component already has metrics, use them
+            if (comp.metrics && comp.metrics.length > 0) {
+                return comp.metrics.map(m => ({
+                    name: m.name,
+                    target: m.target,
+                    status: m.status || 'pending',
+                    description: m.description || 'Defined metric for this component'
+                }));
+            }
+
+            // Generate metrics based on component type and goals
+            const metrics = [];
+
+            // Type-based performance metrics
+            const typeMetrics = {
+                'data': [
+                    { name: 'Query Performance', target: '< 100ms for 95% of queries', description: 'Database operations should complete quickly' },
+                    { name: 'Data Integrity', target: '100% consistency', description: 'No data corruption or loss during operations' }
+                ],
+                'api': [
+                    { name: 'Response Time', target: '< 200ms average', description: 'API endpoints respond within acceptable latency' },
+                    { name: 'Error Rate', target: '< 0.1% of requests', description: 'Minimize failed API calls' }
+                ],
+                'ui': [
+                    { name: 'Load Time', target: '< 2s initial load', description: 'UI renders quickly for users' },
+                    { name: 'Interaction Delay', target: '< 100ms response', description: 'User interactions feel instant' }
+                ],
+                'service': [
+                    { name: 'Processing Time', target: '< 500ms per operation', description: 'Business logic executes efficiently' },
+                    { name: 'Throughput', target: '> 100 ops/sec', description: 'Can handle expected load' }
+                ],
+                'security': [
+                    { name: 'Auth Success Rate', target: '> 99.9%', description: 'Legitimate auth attempts succeed' },
+                    { name: 'Breach Attempts Blocked', target: '100%', description: 'All unauthorized access prevented' }
+                ],
+                'integration': [
+                    { name: 'Connection Uptime', target: '> 99.5%', description: 'External service connections remain stable' },
+                    { name: 'Sync Latency', target: '< 5s', description: 'Data syncs with external services quickly' }
+                ]
+            };
+
+            // Add type-specific metrics
+            const baseMetrics = typeMetrics[comp.type] || typeMetrics['service'];
+            baseMetrics.forEach(m => {
+                metrics.push({ ...m, status: 'pending' });
+            });
+
+            // Add goal-based metrics (derive from first 2 goals)
+            (comp.goals || []).slice(0, 2).forEach((goal, i) => {
+                const goalShort = goal.substring(0, 30) + (goal.length > 30 ? '...' : '');
+                metrics.push({
+                    name: `Goal ${i + 1} Complete`,
+                    target: '100% implemented',
+                    status: 'pending',
+                    description: `Verify: ${goalShort}`
+                });
+            });
+
+            // Add test coverage metric
+            metrics.push({
+                name: 'Test Coverage',
+                target: '> 80%',
+                status: 'pending',
+                description: 'Code is well-tested with unit and integration tests'
+            });
+
+            // Add code quality metric
+            metrics.push({
+                name: 'Code Quality',
+                target: 'No critical issues',
+                status: 'pending',
+                description: 'Passes linting and has no security vulnerabilities'
+            });
+
+            return metrics;
+        }
+
+        function findComponentDependencies(compId) {
+            const dependsOn = [];
+            const dependedBy = [];
+
+            if (!architecture || !architecture.edges) {
+                return { dependsOn, dependedBy };
+            }
+
+            architecture.edges.forEach(edge => {
+                if (edge.from === compId) {
+                    const target = architecture.components.find(c => c.id === edge.to);
+                    if (target) {
+                        dependsOn.push({ id: target.id, label: target.label, type: edge.type });
+                    }
+                }
+                if (edge.to === compId) {
+                    const source = architecture.components.find(c => c.id === edge.from);
+                    if (source) {
+                        dependedBy.push({ id: source.id, label: source.label, type: edge.type });
+                    }
+                }
+            });
+
+            return { dependsOn, dependedBy };
+        }
+
+        window.startImplementation = function() {
+            if (!selectedComponentId) {
+                alert('Please select a component first');
+                return;
+            }
+            alert(`Starting implementation for component: ${selectedComponentId}\n\nThis would trigger the worker agents to begin building this component.`);
+        };
+
+        window.generateTasks = function() {
+            if (!selectedComponentId) {
+                alert('Please select a component first');
+                return;
+            }
+            alert(`Breaking down component into tasks: ${selectedComponentId}\n\nThis would create detailed tasks for each implementation step.`);
+        };
+
+        async function renderDiagram() {
+            const viewport = document.getElementById('mermaid-viewport');
+
+            // Generate Mermaid code
+            const code = generateMermaidCode();
+
+            if (!code) {
+                viewport.innerHTML = '<div class="empty-state"><h3>No Components</h3><p>Architecture has no components to display</p></div>';
+                return;
+            }
+
+            try {
+                const { svg } = await mermaid.render('arch-diagram', code);
+                viewport.innerHTML = svg;
+
+                // Make nodes clickable
+                setTimeout(() => {
+                    document.querySelectorAll('#mermaid-viewport svg g.node').forEach(node => {
+                        node.style.cursor = 'pointer';
+                        node.onclick = (e) => {
+                            e.stopPropagation();
+                            const nodeId = node.id?.replace('flowchart-', '').split('-')[0];
+                            if (nodeId) selectComponent(nodeId);
+                        };
+                    });
+                }, 100);
+            } catch (err) {
+                console.error('Mermaid render error:', err);
+                viewport.innerHTML = `<div class="empty-state"><h3>Diagram Error</h3><p>${err.message}</p><pre style="text-align: left; font-size: 10px; margin-top: 12px; max-height: 200px; overflow: auto;">${code}</pre></div>`;
+            }
+        }
+
+        function generateMermaidCode() {
+            if (!architecture || !architecture.components || architecture.components.length === 0) {
+                return null;
+            }
+
+            let code = 'flowchart TD\n';
+
+            // Sanitize for Mermaid
+            function sanitize(str) {
+                if (!str) return '';
+                return String(str).replace(/[<>{}|#&;\[\]()\/\\"']/g, '').substring(0, 40);
+            }
+
+            function safeId(id) {
+                let safe = String(id).replace(/[^a-zA-Z0-9_]/g, '_');
+                if (!/^[a-zA-Z]/.test(safe)) safe = 'n_' + safe;
+                return safe;
+            }
+
+            // Add nodes
+            architecture.components.forEach(comp => {
+                const id = safeId(comp.id);
+                const label = sanitize(comp.label || comp.id);
+                code += `    ${id}["${label}"]\n`;
+            });
+
+            // Add edges
+            const validIds = new Set(architecture.components.map(c => safeId(c.id)));
+            (architecture.edges || []).forEach(edge => {
+                const fromId = safeId(edge.from);
+                const toId = safeId(edge.to);
+
+                if (validIds.has(fromId) && validIds.has(toId)) {
+                    const label = edge.label ? `|${sanitize(edge.label)}|` : '';
+                    code += `    ${fromId} -->${label} ${toId}\n`;
+                }
+            });
+
+            return code;
+        }
+
+        // Zoom controls
+        window.zoomIn = function() {
+            zoomLevel = Math.min(zoomLevel + 0.2, 3);
+            updateTransform();
+        };
+
+        window.zoomOut = function() {
+            zoomLevel = Math.max(zoomLevel - 0.2, 0.3);
+            updateTransform();
+        };
+
+        window.resetZoom = function() {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+            updateTransform();
+        };
+
+        function updateTransform() {
+            const viewport = document.getElementById('mermaid-viewport');
+            viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+        }
+
+        // Pan controls
+        const container = document.getElementById('mermaid-container');
+        container.addEventListener('mousedown', (e) => {
+            if (e.target.closest('g.node')) return;
+            isPanning = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            panX = e.clientX - startX;
+            panY = e.clientY - startY;
+            updateTransform();
+        });
+
+        document.addEventListener('mouseup', () => {
+            isPanning = false;
+        });
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                zoomLevel = Math.min(zoomLevel + 0.1, 3);
+            } else {
+                zoomLevel = Math.max(zoomLevel - 0.1, 0.3);
+            }
+            updateTransform();
+        });
+
+        // Approve design
+        window.approveDesign = async function() {
+            if (!projectId) return;
+
+            if (!confirm('Approve this architecture and proceed to the planning phase?')) return;
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alert('Design approved! Moving to planning phase.');
+                    // Could redirect to a planning page here
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to approve'));
+                }
+            } catch (err) {
+                alert('Error approving design: ' + err.message);
+            }
+        };
+
+        function showError(message) {
+            document.getElementById('componentTree').innerHTML = `<div class="empty-state"><h3>Error</h3><p>${message}</p></div>`;
+            document.getElementById('mermaid-viewport').innerHTML = `<div class="empty-state"><h3>Error</h3><p>${message}</p></div>`;
+        }
+
+        // =========================================================================
+        // AI CHAT FUNCTIONALITY
+        // =========================================================================
+
+        let chatOpen = false;
+        let chatHistory = [];
+        let currentChatSection = null;
+
+        // Make chat panel draggable
+        (function initDraggableChat() {
+            const panel = document.getElementById('chatPanel');
+            const header = panel.querySelector('.chat-header');
+            let isDragging = false;
+            let startX, startY, initialX, initialY;
+
+            header.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('chat-close')) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = panel.getBoundingClientRect();
+                initialX = rect.left;
+                initialY = rect.top;
+                panel.style.transition = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                panel.style.left = (initialX + dx) + 'px';
+                panel.style.top = (initialY + dy) + 'px';
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                panel.style.transition = '';
+            });
+        })();
+
+        window.toggleChat = function() {
+            chatOpen = !chatOpen;
+            document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+
+            // Toggle clickable sections
+            document.querySelectorAll('.prd-section[data-section]').forEach(section => {
+                section.classList.toggle('chat-clickable', chatOpen);
+            });
+
+            if (chatOpen) {
+                document.getElementById('chatInput').focus();
+                updateChatContext();
+            } else {
+                // Remove active state from sections
+                document.querySelectorAll('.prd-section.chat-active').forEach(s => {
+                    s.classList.remove('chat-active');
+                });
+                currentChatSection = null;
+            }
+        };
+
+        // Make PRD sections clickable
+        document.addEventListener('click', (e) => {
+            if (!chatOpen) return;
+
+            const section = e.target.closest('.prd-section[data-section]');
+            if (section) {
+                // Remove previous active
+                document.querySelectorAll('.prd-section.chat-active').forEach(s => {
+                    s.classList.remove('chat-active');
+                });
+
+                // Set new active
+                section.classList.add('chat-active');
+                currentChatSection = section.dataset.section;
+                updateChatContext();
+
+                // Focus chat input
+                document.getElementById('chatInput').focus();
+
+                // Add contextual suggestions
+                updateSuggestionsForSection(currentChatSection);
+            }
+        });
+
+        function updateChatContext() {
+            const contextEl = document.getElementById('chatContext');
+            if (window.currentPRDComponent) {
+                const comp = window.currentPRDComponent;
+                let contextText = `<strong>Component:</strong> ${comp.label || comp.id} <span style="opacity: 0.6">(${comp.type})</span>`;
+
+                if (currentChatSection) {
+                    const sectionNames = {
+                        'overview': 'Overview',
+                        'scope': 'Scope & Boundaries',
+                        'interface': 'Interface Contract',
+                        'dependencies': 'Dependencies',
+                        'acceptance': 'Acceptance Criteria',
+                        'metrics': 'Success Metrics',
+                        'implementation': 'Implementation Guide',
+                        'testing': 'Test Cases',
+                        'files': 'Files'
+                    };
+                    contextText += `<br><strong>Focus:</strong> <span style="color: var(--accent-color);">${sectionNames[currentChatSection]}</span>`;
+                }
+                contextEl.innerHTML = contextText;
+            } else {
+                contextEl.innerHTML = `<strong>Context:</strong> Select a component to discuss`;
+            }
+        }
+
+        function updateSuggestionsForSection(section) {
+            const suggestionsEl = document.getElementById('chatSuggestions');
+            const suggestions = {
+                'overview': [
+                    { text: 'Clarify the problem', action: 'Clarify the problem statement' },
+                    { text: 'Rewrite summary', action: 'Rewrite the summary to be clearer' },
+                    { text: 'Add context', action: 'What context is missing from the overview?' }
+                ],
+                'scope': [
+                    { text: 'Add to scope', action: 'What else should be in scope?' },
+                    { text: 'Reduce scope', action: 'What can we remove from scope for v1?' },
+                    { text: 'Clarify boundaries', action: 'Are the scope boundaries clear enough?' }
+                ],
+                'interface': [
+                    { text: 'Add input', action: 'What inputs am I missing?' },
+                    { text: 'Add output', action: 'What outputs should this produce?' },
+                    { text: 'Add method', action: 'What methods should this expose?' }
+                ],
+                'dependencies': [
+                    { text: 'Missing deps', action: 'What dependencies might I be missing?' },
+                    { text: 'Reduce coupling', action: 'How can I reduce coupling to dependencies?' },
+                    { text: 'Mock strategy', action: 'How should I mock these dependencies for testing?' }
+                ],
+                'acceptance': [
+                    { text: 'Add criteria', action: 'What acceptance criteria am I missing?' },
+                    { text: 'Add edge cases', action: 'What edge cases should I handle?' },
+                    { text: 'Error scenarios', action: 'What error scenarios need handling?' }
+                ],
+                'metrics': [
+                    { text: 'Add metric', action: 'What other metrics should I track?' },
+                    { text: 'Set targets', action: 'Are these targets realistic?' },
+                    { text: 'Measure how', action: 'How should I measure these metrics?' }
+                ],
+                'implementation': [
+                    { text: 'Simplify steps', action: 'How can I simplify the implementation?' },
+                    { text: 'Add detail', action: 'Which steps need more detail?' },
+                    { text: 'Reorder', action: 'Is this the right order for implementation?' }
+                ],
+                'testing': [
+                    { text: 'Add test', action: 'What test cases am I missing?' },
+                    { text: 'Priority', action: 'Which tests should I write first?' },
+                    { text: 'Mock data', action: 'What mock data do I need for testing?' }
+                ],
+                'files': [
+                    { text: 'Add file', action: 'What files am I missing?' },
+                    { text: 'Structure', action: 'Is this the right file structure?' },
+                    { text: 'Naming', action: 'Are these file names following conventions?' }
+                ]
+            };
+
+            const sectionSuggestions = suggestions[section] || [
+                { text: 'Add edge cases', action: 'Add more edge cases' },
+                { text: 'Simplify', action: 'Simplify the scope' },
+                { text: 'Add validation', action: 'Add input validation' }
+            ];
+
+            suggestionsEl.innerHTML = sectionSuggestions.map(s =>
+                `<span class="chat-suggestion" onclick="useSuggestion('${s.action}')">${s.text}</span>`
+            ).join('');
+        }
+
+        window.useSuggestion = function(text) {
+            document.getElementById('chatInput').value = text;
+            document.getElementById('chatInput').focus();
+        };
+
+        window.handleChatKeypress = function(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        };
+
+        window.sendChatMessage = async function() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const comp = window.currentPRDComponent;
+            if (!comp) {
+                addChatMessage('ai', 'Please select a component first so I can help you refine its design.');
+                return;
+            }
+
+            // Add user message
+            addChatMessage('user', message);
+            input.value = '';
+
+            // Show typing indicator
+            const typingId = addChatMessage('ai', 'Thinking...', true);
+
+            // Build context for AI
+            const context = buildComponentContext(comp);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        component: context,
+                        section: currentChatSection,
+                        history: chatHistory.slice(-6) // Last 3 exchanges
+                    })
+                });
+
+                const data = await response.json();
+
+                // Remove typing indicator
+                removeMessage(typingId);
+
+                if (data.status === 'success') {
+                    addChatMessage('ai', data.response);
+
+                    // If AI suggests changes, offer to apply them
+                    if (data.changes) {
+                        addChatMessage('ai', `<div style="margin-top: 8px; padding: 8px; background: rgba(0,255,204,0.1); border-radius: 4px;">
+                            <strong>Suggested changes:</strong><br>
+                            ${data.changes.map(c => `• ${c}`).join('<br>')}
+                            <br><br>
+                            <button onclick="applyChanges()" style="padding: 4px 12px; background: var(--accent-color); color: #000; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Apply Changes</button>
+                        </div>`);
+                    }
+
+                    // Update history
+                    chatHistory.push({ role: 'user', content: message });
+                    chatHistory.push({ role: 'assistant', content: data.response });
+                } else {
+                    addChatMessage('ai', 'Sorry, I encountered an error. Please try again.');
+                }
+            } catch (err) {
+                removeMessage(typingId);
+                // Fallback: provide a helpful response without backend
+                const fallbackResponse = generateLocalResponse(message, comp, currentChatSection);
+                addChatMessage('ai', fallbackResponse);
+            }
+        };
+
+        function addChatMessage(role, content, isTyping = false) {
+            const messagesEl = document.getElementById('chatMessages');
+            const msgEl = document.createElement('div');
+            const msgId = 'msg-' + Date.now();
+            msgEl.id = msgId;
+            msgEl.className = `chat-message ${role}${isTyping ? ' typing' : ''}`;
+            msgEl.innerHTML = content;
+            messagesEl.appendChild(msgEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            return msgId;
+        }
+
+        function removeMessage(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function buildComponentContext(comp) {
+            const deps = findComponentDependencies(comp.id);
+            return {
+                id: comp.id,
+                label: comp.label,
+                type: comp.type,
+                summary: comp.summary,
+                problem: comp.problem_statement,
+                goals: comp.goals || [],
+                requirements: comp.requirements || [],
+                inputs: comp.inputs || [],
+                outputs: comp.outputs || [],
+                risks: comp.risks || [],
+                dependencies: {
+                    upstream: deps.dependsOn.map(d => d.label),
+                    downstream: deps.dependedBy.map(d => d.label)
+                }
+            };
+        }
+
+        // Local fallback responses when API isn't available
+        function generateLocalResponse(message, comp, section) {
+            const lower = message.toLowerCase();
+
+            // Section-specific responses
+            if (section) {
+                const sectionResponses = {
+                    'overview': () => {
+                        if (lower.includes('problem') || lower.includes('clarify')) {
+                            return `Let's clarify the problem statement for ${comp.label}:\n\nCurrent: "${comp.problem_statement || 'Not defined'}"\n\nA good problem statement should answer:\n• What pain point does this solve?\n• Who experiences this problem?\n• What happens if we don't solve it?\n\nTry: "Users currently [problem] which causes [impact]. This component will [solution]."\n\nWant me to help draft a clearer version?`;
+                        }
+                        if (lower.includes('summary') || lower.includes('rewrite')) {
+                            return `Current summary: "${comp.summary || 'Not defined'}"\n\nA good summary should:\n• Be one sentence (max two)\n• Describe what it DOES, not how\n• Be understandable by non-technical stakeholders\n\nTemplate: "${comp.label} [action verb] [what] for [who/what purpose]."\n\nWhat's the core value this component provides?`;
+                        }
+                        return `For the Overview section, I can help with:\n• Clarifying the problem statement\n• Rewriting the summary\n• Adding business context\n\nWhat would you like to improve?`;
+                    },
+                    'scope': () => {
+                        if (lower.includes('add') || lower.includes('missing')) {
+                            return `Looking at ${comp.label}'s current scope, consider adding:\n\n${getScopeSuggestionsForType(comp.type).map(s => `• ${s}`).join('\n')}\n\nWhich of these are relevant to your use case?`;
+                        }
+                        if (lower.includes('reduce') || lower.includes('remove') || lower.includes('v1')) {
+                            return `To reduce scope for ${comp.label} v1:\n\n• Keep: ${(comp.goals || ['core functionality'])[0]}\n• Defer: Advanced features, optimizations, edge cases\n• Remove: "Nice to have" features\n\nPrinciple: Ship the smallest thing that provides value.\n\nWhat feels like it could wait for v2?`;
+                        }
+                        return `For Scope, I can help:\n• Identify what's missing from scope\n• Suggest what to defer to v2\n• Clarify boundaries with other components\n\nWhat's your main concern?`;
+                    },
+                    'interface': () => {
+                        if (lower.includes('input') || lower.includes('missing')) {
+                            return `For ${comp.label} inputs, consider:\n\n${getInputSuggestionsForType(comp.type).map(i => `• ${i}`).join('\n')}\n\nCurrent inputs: ${(comp.inputs || ['None']).join(', ')}\n\nWhich of these does your component need?`;
+                        }
+                        if (lower.includes('output') || lower.includes('produce')) {
+                            return `For ${comp.label} outputs, consider:\n\n${getOutputSuggestionsForType(comp.type).map(o => `• ${o}`).join('\n')}\n\nCurrent outputs: ${(comp.outputs || ['None']).join(', ')}\n\nWhat else should this component produce?`;
+                        }
+                        if (lower.includes('method') || lower.includes('endpoint')) {
+                            return `Common methods for ${comp.type} components:\n\n${getMethodSuggestionsForType(comp.type).map(m => `• ${m}`).join('\n')}\n\nWhich of these does ${comp.label} need?`;
+                        }
+                        return `For Interface Contract, I can help with:\n• Defining input schemas\n• Specifying outputs\n• Designing method signatures\n\nWhat aspect needs work?`;
+                    },
+                    'dependencies': () => {
+                        if (lower.includes('missing') || lower.includes('need')) {
+                            return `${comp.label} might also depend on:\n\n${getDependencySuggestionsForType(comp.type).map(d => `• ${d}`).join('\n')}\n\nDo any of these apply to your architecture?`;
+                        }
+                        if (lower.includes('coupling') || lower.includes('reduce')) {
+                            return `To reduce coupling for ${comp.label}:\n\n• Use interfaces/contracts instead of concrete implementations\n• Inject dependencies rather than creating them\n• Use events for loose communication\n• Cache or buffer data to reduce call frequency\n\nWhich dependencies are too tightly coupled?`;
+                        }
+                        return `For Dependencies, I can help:\n• Identify missing dependencies\n• Reduce coupling\n• Plan mocking strategy\n\nWhat's your concern?`;
+                    },
+                    'acceptance': () => {
+                        if (lower.includes('criteria') || lower.includes('missing')) {
+                            return `Additional acceptance criteria for ${comp.label}:\n\n${getAcceptanceSuggestionsForType(comp.type).map(a => `• ${a}`).join('\n')}\n\nWhich of these should we add?`;
+                        }
+                        if (lower.includes('edge') || lower.includes('case')) {
+                            const edgeCases = getEdgeCasesForType(comp.type);
+                            return `Edge cases for ${comp.label}:\n\n${edgeCases.map(e => `• ${e}`).join('\n')}\n\nWhich of these are most critical to handle?`;
+                        }
+                        if (lower.includes('error') || lower.includes('scenario')) {
+                            return `Error scenarios for ${comp.label}:\n\n${getErrorScenariosForType(comp.type).map(e => `• ${e}`).join('\n')}\n\nHow should each be handled?`;
+                        }
+                        return `For Acceptance Criteria, I can help:\n• Add functional requirements\n• Identify edge cases\n• Define error handling needs\n\nWhat needs attention?`;
+                    },
+                    'metrics': () => {
+                        if (lower.includes('add') || lower.includes('other') || lower.includes('track')) {
+                            return `Additional metrics for ${comp.label}:\n\n${getMetricSuggestionsForType(comp.type).map(m => `• ${m.name}: ${m.target}`).join('\n')}\n\nWhich of these are important for your use case?`;
+                        }
+                        if (lower.includes('realistic') || lower.includes('target')) {
+                            return `Reviewing targets for ${comp.label}:\n\n• Start with industry benchmarks\n• Consider your infrastructure constraints\n• Set initial targets conservatively\n• Plan to tighten after baseline measurement\n\nWhich targets seem unrealistic?`;
+                        }
+                        return `For Metrics, I can help:\n• Suggest additional metrics\n• Review if targets are realistic\n• Plan how to measure\n\nWhat needs work?`;
+                    },
+                    'implementation': () => {
+                        if (lower.includes('simplify') || lower.includes('simpler')) {
+                            return `To simplify ${comp.label} implementation:\n\n• Start with hardcoded values, make configurable later\n• Skip optimizations until needed\n• Use existing libraries instead of custom code\n• Break complex steps into smaller functions\n\nWhich step feels too complex?`;
+                        }
+                        if (lower.includes('detail') || lower.includes('more')) {
+                            return `Steps that typically need more detail:\n\n• Data validation logic\n• Error handling specifics\n• Integration points with dependencies\n• State management\n\nWhich step should I expand?`;
+                        }
+                        return `For Implementation, I can help:\n• Simplify complex steps\n• Add more detail where needed\n• Reorder for better flow\n\nWhat needs adjustment?`;
+                    },
+                    'testing': () => {
+                        if (lower.includes('add') || lower.includes('missing')) {
+                            return `Additional tests for ${comp.label}:\n\n${getTestSuggestionsForType(comp.type).map(t => `• ${t}`).join('\n')}\n\nWhich of these should we add?`;
+                        }
+                        if (lower.includes('priority') || lower.includes('first')) {
+                            return `Test priority for ${comp.label}:\n\n1. Happy path - core functionality works\n2. Input validation - rejects bad data\n3. Error handling - fails gracefully\n4. Edge cases - handles unusual scenarios\n5. Performance - meets targets under load\n\nStart with #1-3, add others incrementally.`;
+                        }
+                        return `For Testing, I can help:\n• Suggest missing test cases\n• Prioritize what to test first\n• Define mock data needs\n\nWhat's your focus?`;
+                    },
+                    'files': () => {
+                        if (lower.includes('add') || lower.includes('missing')) {
+                            return `${comp.label} might also need:\n\n${getFileSuggestionsForType(comp.type).map(f => `• ${f}`).join('\n')}\n\nWhich of these are relevant?`;
+                        }
+                        if (lower.includes('structure') || lower.includes('organization')) {
+                            return `Recommended file structure for ${comp.type}:\n\n${getFileStructureForType(comp.type)}\n\nDoes this match your project conventions?`;
+                        }
+                        return `For Files, I can help:\n• Identify missing files\n• Review structure\n• Check naming conventions\n\nWhat needs review?`;
+                    }
+                };
+
+                if (sectionResponses[section]) {
+                    return sectionResponses[section]();
+                }
+            }
+
+            // General responses (no section selected)
+            if (lower.includes('edge case') || lower.includes('edge cases')) {
+                const edgeCases = getEdgeCasesForType(comp.type);
+                return `Here are some edge cases to consider for ${comp.label}:\n\n${edgeCases.map(e => `• ${e}`).join('\n')}\n\nWould you like me to add any of these to the component spec?`;
+            }
+
+            if (lower.includes('simplify') || lower.includes('reduce scope')) {
+                return `To simplify ${comp.label}, consider:\n\n• Focus on the core goal: "${(comp.goals || ['main functionality'])[0]}"\n• Remove any "nice to have" features for v1\n• Delegate complex logic to dependent services\n• Start with the minimum viable interface\n\nWhat specific part feels too complex?`;
+            }
+
+            if (lower.includes('validation') || lower.includes('validate')) {
+                return `For input validation in ${comp.label}:\n\n• Validate all required fields are present\n• Check data types match expected schema\n• Validate ranges/lengths for numeric/string fields\n• Sanitize any user-provided strings\n• Return clear error messages for each validation failure\n\nWhich inputs need the most validation attention?`;
+            }
+
+            if (lower.includes('error') || lower.includes('exception')) {
+                return `Error handling recommendations for ${comp.label}:\n\n• Define specific error types (ValidationError, NotFoundError, etc.)\n• Never expose internal errors to external consumers\n• Log errors with full context for debugging\n• Provide actionable error messages\n• Implement retry logic for transient failures\n\nWhat error scenarios concern you most?`;
+            }
+
+            // Default: suggest clicking a section
+            return `I can help you refine ${comp.label}!\n\n**Tip:** Click on any section in the PRD (like "Scope" or "Interface") to focus our discussion on that specific area.\n\nOr ask me about:\n• Edge cases\n• Validation\n• Error handling\n• Simplifying scope`;
+        }
+
+        // Helper functions for section-specific suggestions
+        function getScopeSuggestionsForType(type) {
+            const suggestions = {
+                'data': ['Data migration support', 'Backup/restore capabilities', 'Audit logging', 'Soft deletes'],
+                'api': ['Rate limiting', 'Request validation', 'Response caching', 'API versioning'],
+                'ui': ['Accessibility (a11y)', 'Responsive design', 'Loading states', 'Error states'],
+                'service': ['Retry logic', 'Circuit breaker', 'Caching layer', 'Logging/tracing'],
+                'security': ['Token refresh', 'Session management', 'Audit logging', 'Rate limiting'],
+                'integration': ['Retry with backoff', 'Response caching', 'Health checks', 'Fallback behavior']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getInputSuggestionsForType(type) {
+            const suggestions = {
+                'data': ['Query filters', 'Pagination params', 'Sort options', 'Field selection'],
+                'api': ['Auth token', 'Request headers', 'Query params', 'Request body'],
+                'ui': ['Props from parent', 'URL params', 'User events', 'API responses'],
+                'service': ['Config options', 'Context/metadata', 'Callback functions', 'Feature flags'],
+                'security': ['Credentials', 'Token', 'Permissions scope', 'Client ID'],
+                'integration': ['API key', 'Request payload', 'Timeout config', 'Retry config']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getOutputSuggestionsForType(type) {
+            const suggestions = {
+                'data': ['Query results', 'Affected row count', 'Generated IDs', 'Validation errors'],
+                'api': ['Response body', 'Status code', 'Headers', 'Error details'],
+                'ui': ['Rendered content', 'Event callbacks', 'Form data', 'Navigation actions'],
+                'service': ['Processed result', 'Status/metadata', 'Events emitted', 'Metrics'],
+                'security': ['Auth token', 'Session data', 'Permission set', 'Audit record'],
+                'integration': ['Transformed data', 'Raw response', 'Status info', 'Error details']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getMethodSuggestionsForType(type) {
+            const suggestions = {
+                'data': ['create()', 'read()', 'update()', 'delete()', 'list()', 'search()'],
+                'api': ['GET /', 'POST /', 'GET /:id', 'PUT /:id', 'DELETE /:id', 'PATCH /:id'],
+                'ui': ['render()', 'onSubmit()', 'onChange()', 'onMount()', 'onDestroy()'],
+                'service': ['execute()', 'validate()', 'process()', 'getStatus()', 'cancel()'],
+                'security': ['authenticate()', 'authorize()', 'refresh()', 'revoke()', 'validate()'],
+                'integration': ['connect()', 'fetch()', 'send()', 'sync()', 'healthCheck()']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getDependencySuggestionsForType(type) {
+            const suggestions = {
+                'data': ['Connection pool', 'Cache service', 'Logger', 'Migration runner'],
+                'api': ['Auth middleware', 'Validation service', 'Rate limiter', 'Logger'],
+                'ui': ['State store', 'Router', 'API client', 'Theme provider'],
+                'service': ['Data layer', 'Config service', 'Logger', 'Event bus'],
+                'security': ['User store', 'Token service', 'Crypto utils', 'Audit logger'],
+                'integration': ['HTTP client', 'Retry service', 'Cache', 'Circuit breaker']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getAcceptanceSuggestionsForType(type) {
+            const suggestions = {
+                'data': ['Queries return within SLA', 'Data integrity maintained', 'Concurrent access handled'],
+                'api': ['Returns correct status codes', 'Validates all inputs', 'Handles auth correctly'],
+                'ui': ['Renders in all browsers', 'Accessible via keyboard', 'Shows loading states'],
+                'service': ['Processes within timeout', 'Handles partial failures', 'Logs all operations'],
+                'security': ['Rejects invalid credentials', 'Tokens expire correctly', 'Audit trail complete'],
+                'integration': ['Handles timeouts gracefully', 'Retries transient failures', 'Caches when appropriate']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getErrorScenariosForType(type) {
+            const suggestions = {
+                'data': ['Connection lost', 'Query timeout', 'Constraint violation', 'Deadlock'],
+                'api': ['Invalid JSON', 'Auth expired', 'Rate limited', 'Upstream timeout'],
+                'ui': ['Network offline', 'API error', 'Invalid state', 'Missing data'],
+                'service': ['Dependency down', 'Invalid input', 'Timeout', 'Resource exhausted'],
+                'security': ['Invalid token', 'Expired session', 'Permission denied', 'Account locked'],
+                'integration': ['Service unavailable', 'Invalid response', 'Rate limited', 'SSL error']
+            };
+            return suggestions[type] || suggestions['service'];
+        }
+
+        function getMetricSuggestionsForType(type) {
+            const metrics = {
+                'data': [{ name: 'Query latency p99', target: '< 100ms' }, { name: 'Cache hit rate', target: '> 80%' }],
+                'api': [{ name: 'Request latency p95', target: '< 200ms' }, { name: 'Error rate', target: '< 1%' }],
+                'ui': [{ name: 'Time to interactive', target: '< 3s' }, { name: 'Lighthouse score', target: '> 90' }],
+                'service': [{ name: 'Processing time', target: '< 500ms' }, { name: 'Success rate', target: '> 99%' }],
+                'security': [{ name: 'Auth latency', target: '< 100ms' }, { name: 'False rejection rate', target: '< 0.1%' }],
+                'integration': [{ name: 'External call success', target: '> 99%' }, { name: 'Sync latency', target: '< 5s' }]
+            };
+            return metrics[type] || metrics['service'];
+        }
+
+        function getTestSuggestionsForType(type) {
+            const tests = {
+                'data': ['Test concurrent writes', 'Test large result sets', 'Test rollback on failure'],
+                'api': ['Test auth required endpoints', 'Test validation errors', 'Test rate limiting'],
+                'ui': ['Test keyboard navigation', 'Test screen reader', 'Test slow network'],
+                'service': ['Test dependency failure', 'Test timeout behavior', 'Test partial success'],
+                'security': ['Test brute force protection', 'Test token expiry', 'Test permission boundaries'],
+                'integration': ['Test retry behavior', 'Test circuit breaker', 'Test fallback']
+            };
+            return tests[type] || tests['service'];
+        }
+
+        function getFileSuggestionsForType(type) {
+            const files = {
+                'data': ['schema.sql', 'seeds.sql', 'indexes.sql'],
+                'api': ['middleware.py', 'validators.py', 'openapi.yaml'],
+                'ui': ['styles.module.css', 'hooks.js', 'constants.js'],
+                'service': ['types.py', 'exceptions.py', 'utils.py'],
+                'security': ['policies.py', 'tokens.py', 'audit.py'],
+                'integration': ['mappers.py', 'retry.py', 'mock_client.py']
+            };
+            return files[type] || files['service'];
+        }
+
+        function getFileStructureForType(type) {
+            const structures = {
+                'data': '📁 models/\n  └─ 📄 model.py\n📁 migrations/\n  └─ 📄 001_initial.sql\n📁 tests/\n  └─ 📄 test_model.py',
+                'api': '📁 routes/\n  └─ 📄 endpoints.py\n📁 schemas/\n  └─ 📄 requests.py\n📁 tests/\n  └─ 📄 test_api.py',
+                'ui': '📁 components/\n  ├─ 📄 Component.jsx\n  └─ 📄 Component.css\n📁 tests/\n  └─ 📄 Component.test.js',
+                'service': '📁 services/\n  ├─ 📄 service.py\n  └─ 📄 interface.py\n📁 tests/\n  └─ 📄 test_service.py'
+            };
+            return structures[type] || structures['service'];
+        }
+
+        function getEdgeCasesForType(type) {
+            const cases = {
+                'data': [
+                    'Empty result set from queries',
+                    'Null or undefined field values',
+                    'Duplicate key constraint violations',
+                    'Large batch operations (1000+ records)',
+                    'Concurrent read/write conflicts',
+                    'Foreign key constraint failures',
+                    'Connection pool exhaustion'
+                ],
+                'api': [
+                    'Missing required request fields',
+                    'Invalid data types in payload',
+                    'Malformed JSON body',
+                    'Expired or invalid auth tokens',
+                    'Rate limit exceeded',
+                    'Request timeout',
+                    'Very large request payloads'
+                ],
+                'ui': [
+                    'Empty state (no data to display)',
+                    'Loading state (slow network)',
+                    'Error state (API failure)',
+                    'Very long text content',
+                    'Rapid repeated clicks',
+                    'Browser back/forward navigation',
+                    'Mobile viewport sizes'
+                ],
+                'service': [
+                    'Null/undefined input parameters',
+                    'Dependency service unavailable',
+                    'Partial success (some operations fail)',
+                    'Circular dependency calls',
+                    'Race conditions in concurrent calls',
+                    'Resource limits exceeded'
+                ],
+                'security': [
+                    'Expired tokens during request',
+                    'Invalid credentials format',
+                    'SQL injection attempts',
+                    'XSS attack vectors',
+                    'Brute force login attempts',
+                    'Session hijacking attempts'
+                ],
+                'integration': [
+                    'External service timeout',
+                    'Unexpected response format',
+                    'Rate limiting from external API',
+                    'Partial/incomplete responses',
+                    'SSL certificate issues',
+                    'External service version changes'
+                ]
+            };
+            return cases[type] || cases['service'];
+        }
+
+        window.applyChanges = function() {
+            addChatMessage('ai', 'Change application is not yet implemented. For now, please manually update the component based on the suggestions, or copy the PRD and modify it directly.');
+        };
+
+        // Update context when component is selected
+        const originalSelectComponent = selectComponent;
+        selectComponent = function(compId) {
+            originalSelectComponent(compId);
+            updateChatContext();
+        };
+    </script>
+</body>
+</html>

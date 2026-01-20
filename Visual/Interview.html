@@ -2615,6 +2615,7 @@ KEY FUNCTIONS:
                 <div class="button-row">
                     <button onclick="startOver()" class="secondary">Start Over</button>
                     <button onclick="viewGraph()" class="secondary">View Graph</button>
+                    <button onclick="openArchitectureView()" class="secondary">Architecture View</button>
                 </div>
             </div>
         </div>
@@ -5062,11 +5063,23 @@ KEY FUNCTIONS:
         }
 
         function proceedToDesign() {
-            window.location.href = 'Graph.html';
+            if (currentProjectId) {
+                window.location.href = `Architecture.html?project=${currentProjectId}`;
+            } else {
+                window.location.href = 'Graph.html';
+            }
         }
 
         function viewGraph() {
             window.location.href = 'Graph.html';
+        }
+
+        function openArchitectureView() {
+            if (currentProjectId) {
+                window.location.href = `Architecture.html?project=${currentProjectId}`;
+            } else {
+                alert('No project selected. Please complete the interview first.');
+            }
         }
 
         function startOver() {

@@ -314,21 +314,15 @@ class APIHandler:
         try:
             from agents import ArchitectAgent
 
-            # Optionally analyze codebase first
-            codebase_analysis = None
-            if codebase_path:
-                from analyzers import CodebaseScanner
-                try:
-                    scanner = CodebaseScanner(codebase_path)
-                    analysis = scanner.scan()
-                    codebase_analysis = analysis.to_dict()
-                except Exception as e:
-                    # Continue without codebase analysis
-                    pass
+            # 1. Get Project Brief (as dict)
+            brief = project.to_dict()
 
-            # Run architect
+            # 2. Initialize Architect
             architect = ArchitectAgent(self.db)
-            architecture = architect.execute(project_id, codebase_analysis)
+
+            # 3. Execute
+            # Note: execute(project_id, brief, root_path)
+            architecture = architect.execute(project_id, brief, root_path=codebase_path)
 
             return {
                 "status": "success",
