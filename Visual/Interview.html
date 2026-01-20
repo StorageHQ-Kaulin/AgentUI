@@ -1978,34 +1978,75 @@ KEY FUNCTIONS:
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         mermaid.initialize({
             startOnLoad: false,
-            theme: 'dark'
+            theme: 'dark',
+            securityLevel: 'loose'
         });
+
+        // Debounce and render state management
+        let mermaidRenderPending = null;
+        let mermaidRendering = false;
+        let mermaidRenderCounter = 0;
+
         window.drawMermaid = async function (graphDefinition) {
             console.log('[Mermaid] drawMermaid called with:', graphDefinition?.substring(0, 100));
             const element = document.getElementById('mermaid-container');
+
             if (!graphDefinition) {
                 console.log('[Mermaid] No graph definition provided');
                 element.innerHTML = '<p style="color:#666">No design generated yet</p>';
                 return;
             }
+
+            // Debounce: if a render is pending, replace it
+            if (mermaidRenderPending) {
+                clearTimeout(mermaidRenderPending);
+            }
+
+            // If currently rendering, queue this render for after
+            if (mermaidRendering) {
+                console.log('[Mermaid] Render in progress, queuing...');
+                mermaidRenderPending = setTimeout(() => {
+                    mermaidRenderPending = null;
+                    window.drawMermaid(graphDefinition);
+                }, 100);
+                return;
+            }
+
+            mermaidRendering = true;
+            const renderId = ++mermaidRenderCounter;
+
             try {
-                // Clear previous content and add new diagram
+                // Clear previous content
                 element.innerHTML = '';
+
+                // Create a new div with unique ID for this render
                 const diagramDiv = document.createElement('div');
                 diagramDiv.className = 'mermaid';
+                diagramDiv.id = 'mermaid-diagram-' + renderId;
                 diagramDiv.textContent = graphDefinition;
                 element.appendChild(diagramDiv);
 
-                console.log('[Mermaid] Running mermaid.run...');
+                console.log('[Mermaid] Running mermaid.run (render #' + renderId + ')...');
                 await mermaid.run({
-                    nodes: [diagramDiv]
+                    nodes: [diagramDiv],
+                    suppressErrors: false
                 });
-                console.log('[Mermaid] Diagram rendered successfully');
+                console.log('[Mermaid] Diagram rendered successfully (render #' + renderId + ')');
+
                 // Add click handlers after diagram renders
                 setTimeout(() => window.addDiagramClickHandlers?.(), 150);
             } catch (error) {
                 console.error('[Mermaid] Render error:', error);
-                element.innerHTML = '<p style="color:#e74c3c">Failed to load diagram: ' + error.message + '</p>';
+                // Show error but also the raw code for debugging
+                element.innerHTML = '<div style="padding: 10px;">' +
+                    '<p style="color:#e74c3c; margin-bottom: 10px;">Diagram render error: ' + error.message + '</p>' +
+                    '<details style="color:#666; font-size: 10px;">' +
+                    '<summary style="cursor:pointer;">Show raw diagram code</summary>' +
+                    '<pre style="margin-top:5px; white-space:pre-wrap; word-break:break-all;">' +
+                    graphDefinition.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>' +
+                    '</details></div>';
+            } finally {
+                mermaidRendering = false;
             }
         };
     </script>
@@ -2468,35 +2509,58 @@ KEY FUNCTIONS:
             const idMap = {};
             const validIds = new Set();
 
-            // Add nodes
-            brief.components.forEach(comp => {
-                const safeId = comp.id.replace(/[^a-zA-Z0-9]/g, '_');
-                idMap[comp.id] = safeId;
-                validIds.add(safeId);
-                // Escape special characters in labels
-                const label = (comp.label || 'Component')
+            // Sanitize label for mermaid - remove all potentially breaking characters
+            function sanitizeLabel(label) {
+                if (!label) return 'Component';
+                return String(label)
                     .replace(/"/g, "'")
                     .replace(/\[/g, '(')
                     .replace(/\]/g, ')')
-                    .replace(/[<>]/g, '');
-                code += `    ${safeId}["${label}"]\n`;
+                    .replace(/[<>{}|#&;]/g, '')
+                    .replace(/\\/g, '')
+                    .replace(/\n/g, ' ')
+                    .trim()
+                    .substring(0, 50) || 'Component';
+            }
+
+            // Add nodes
+            brief.components.forEach(comp => {
+                if (!comp || !comp.id) return;
+                // Ensure ID starts with a letter and only contains safe chars
+                let safeId = comp.id.replace(/[^a-zA-Z0-9]/g, '_');
+                if (!/^[a-zA-Z]/.test(safeId)) {
+                    safeId = 'n_' + safeId;
+                }
+                idMap[comp.id] = safeId;
+                validIds.add(safeId);
+                const label = sanitizeLabel(comp.label);
+                code += '    ' + safeId + '["' + label + '"]\n';
             });
 
             // Add edges - only if both nodes exist
             (brief.edges || []).forEach(edge => {
-                if (!edge.from || !edge.to) return;
+                if (!edge || !edge.from || !edge.to) return;
 
-                const fromId = idMap[edge.from] || edge.from.replace(/[^a-zA-Z0-9]/g, '_');
-                const toId = idMap[edge.to] || edge.to.replace(/[^a-zA-Z0-9]/g, '_');
+                const fromId = idMap[edge.from];
+                const toId = idMap[edge.to];
 
-                // Only add edge if both nodes exist
-                if (validIds.has(fromId) && validIds.has(toId)) {
-                    // Generate edge label
-                    var edgeLabel = edge.label ? ("|" + String(edge.label).replace(/["']/g, "").substring(0, 30) + "|") : "";
-
+                // Only add edge if both nodes exist in our map
+                if (fromId && toId && validIds.has(fromId) && validIds.has(toId)) {
+                    // Generate edge label - sanitize it
+                    var edgeLabel = '';
+                    if (edge.label) {
+                        var cleanLabel = String(edge.label)
+                            .replace(/["'|]/g, '')
+                            .replace(/[<>{}#&;\\]/g, '')
+                            .substring(0, 25)
+                            .trim();
+                        if (cleanLabel) {
+                            edgeLabel = '|' + cleanLabel + '|';
+                        }
+                    }
                     code += '    ' + fromId + ' -->' + edgeLabel + ' ' + toId + '\n';
                 } else {
-                    console.log('[generateMermaid] Skipping edge - node not found:', edge);
+                    console.log('[generateMermaid] Skipping edge - node not found:', edge, 'fromId:', fromId, 'toId:', toId);
                 }
             });
 
@@ -3931,15 +3995,13 @@ KEY FUNCTIONS:
                     return;
                 }
 
-                // Update Mermaid - use server diagram or generate from brief
+                // Update Mermaid - always generate from brief to ensure IDs match
                 console.log('[updateClarifySection] Updating diagram...');
-                console.log('[updateClarifySection] currentGraphData.mermaidDiagram:', currentGraphData?.mermaidDiagram);
                 console.log('[updateClarifySection] currentBrief:', currentBrief);
 
-                const mermaidCode = (currentGraphData && currentGraphData.mermaidDiagram)
-                    ? currentGraphData.mermaidDiagram
-                    : generateMermaidFromBrief(currentBrief);
-                console.log('[updateClarifySection] Final mermaidCode:', mermaidCode);
+                // Always use client-generated diagram - server diagram has mismatched IDs
+                const mermaidCode = generateMermaidFromBrief(currentBrief);
+                console.log('[updateClarifySection] Generated mermaidCode:', mermaidCode);
 
                 if (mermaidCode) {
                     // Try to draw, with retry if module not loaded yet
@@ -4101,10 +4163,8 @@ KEY FUNCTIONS:
                 finalComponentsDiv.appendChild(createComponentTag(comp));
             });
 
-            // Final Diagram update - use server diagram or generate from brief
-            const mermaidCode = (currentGraphData && currentGraphData.mermaidDiagram)
-                ? currentGraphData.mermaidDiagram
-                : generateMermaidFromBrief(currentBrief);
+            // Final Diagram update - always generate from brief to ensure IDs match
+            const mermaidCode = generateMermaidFromBrief(currentBrief);
             if (mermaidCode) {
                 const tryDraw = (attempts = 0) => {
                     if (window.drawMermaid) {
