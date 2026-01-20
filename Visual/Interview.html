@@ -2064,7 +2064,9 @@ KEY FUNCTIONS:
             display: none;
             min-width: 280px;
             max-width: 350px;
-            overflow: hidden;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         #component-submenu.visible {
@@ -3135,27 +3137,45 @@ KEY FUNCTIONS:
                 ioEl.classList.remove('visible');
             }
 
-            // Position the submenu
-            const menuWidth = 320;
-            const menuHeight = 450;
-            const padding = 10;
+            // Position the submenu - show it first to get actual dimensions
+            submenu.style.visibility = 'hidden';
+            submenu.classList.add('visible');
 
-            // Adjust position to stay within viewport
+            const padding = 15;
+            const menuRect = submenu.getBoundingClientRect();
+            const menuWidth = menuRect.width || 320;
+            const menuHeight = menuRect.height || 400;
+
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            // Calculate best position
             let posX = x + padding;
-            let posY = y + padding;
+            let posY = y;
 
-            if (posX + menuWidth > window.innerWidth) {
-                posX = x - menuWidth - padding;
+            // If menu would go off right edge, position to the left of click point
+            if (posX + menuWidth > viewportWidth - padding) {
+                posX = Math.max(padding, x - menuWidth - padding);
             }
-            if (posY + menuHeight > window.innerHeight) {
-                posY = window.innerHeight - menuHeight - padding;
+
+            // If menu would go off bottom, position above or constrain to viewport
+            if (posY + menuHeight > viewportHeight - padding) {
+                // Try positioning above the click point
+                if (y - menuHeight - padding > padding) {
+                    posY = y - menuHeight - padding;
+                } else {
+                    // Constrain to viewport
+                    posY = Math.max(padding, viewportHeight - menuHeight - padding);
+                }
             }
-            if (posX < padding) posX = padding;
-            if (posY < padding) posY = padding;
+
+            // Final bounds check
+            posX = Math.max(padding, Math.min(posX, viewportWidth - menuWidth - padding));
+            posY = Math.max(padding, Math.min(posY, viewportHeight - menuHeight - padding));
 
             submenu.style.left = posX + 'px';
             submenu.style.top = posY + 'px';
-            submenu.classList.add('visible');
+            submenu.style.visibility = 'visible';
         }
 
         function hideComponentSubmenu() {
