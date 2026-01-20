@@ -37,6 +37,14 @@ class GeneralManagerAgent(BaseAgent):
             config=config
         )
 
+    def get_scoped_context(self) -> Dict[str, Any]:
+        """GM sees all components but not implementation details."""
+        return {
+            "role": "general_manager",
+            "access": ["components", "edges", "project_summary"],
+            "restrictions": ["no_code_access", "no_task_details"]
+        }
+
     def execute(self, project_id: str) -> Dict[str, Any]:
         """
         Execute GM phase: analyze components and create build plans.
