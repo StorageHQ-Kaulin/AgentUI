@@ -1163,6 +1163,114 @@
             font-style: italic;
         }
 
+        /* AI Response Formatting */
+        .chat-message.ai strong, .chat-message.ai b {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .chat-message.ai code {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: #a855f7;
+        }
+
+        .chat-message.ai pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 8px 0;
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .chat-message.ai pre code {
+            background: none;
+            padding: 0;
+            color: var(--text-color);
+        }
+
+        .chat-message.ai ul, .chat-message.ai ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .chat-message.ai li {
+            margin: 4px 0;
+            line-height: 1.5;
+        }
+
+        .chat-message.ai h2 {
+            color: var(--accent-color);
+            font-size: 15px;
+            font-weight: 700;
+            margin: 14px 0 8px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(0, 255, 204, 0.3);
+        }
+
+        .chat-message.ai h3 {
+            color: var(--accent-color);
+            font-size: 13px;
+            font-weight: 700;
+            margin: 12px 0 6px 0;
+        }
+
+        .chat-message.ai h4, .chat-message.ai .section-header {
+            color: var(--accent-color);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 12px 0 6px 0;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(0, 255, 204, 0.2);
+        }
+
+        .chat-message.ai em, .chat-message.ai i {
+            font-style: italic;
+            color: var(--text-muted);
+        }
+
+        .chat-message.ai p {
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+
+        .chat-message.ai .highlight {
+            background: rgba(0, 255, 204, 0.15);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: var(--accent-color);
+        }
+
+        .chat-message.ai .warning {
+            background: rgba(245, 158, 11, 0.15);
+            padding: 8px 10px;
+            border-radius: 6px;
+            border-left: 3px solid #f59e0b;
+            margin: 8px 0;
+        }
+
+        .chat-message.ai .suggestion-box {
+            background: rgba(59, 130, 246, 0.1);
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            margin: 8px 0;
+        }
+
+        .chat-message.ai .suggestion-box-title {
+            font-weight: 600;
+            color: #3b82f6;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
         .chat-input-area {
             padding: 12px;
             border-top: 1px solid var(--border-color);
@@ -3160,41 +3268,94 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                         message: message,
                         component: context,
                         section: currentChatSection,
-                        history: chatHistory.slice(-6) // Last 3 exchanges
+                        history: chatHistory.slice(-6)
                     })
                 });
 
                 const data = await response.json();
-
-                // Remove typing indicator
                 removeMessage(typingId);
 
-                if (data.status === 'success') {
-                    addChatMessage('ai', data.response);
-
-                    // If AI suggests changes, offer to apply them
-                    if (data.changes) {
-                        addChatMessage('ai', `<div style="margin-top: 8px; padding: 8px; background: rgba(0,255,204,0.1); border-radius: 4px;">
-                            <strong>Suggested changes:</strong><br>
-                            ${data.changes.map(c => `• ${c}`).join('<br>')}
-                            <br><br>
-                            <button onclick="applyChanges()" style="padding: 4px 12px; background: var(--accent-color); color: #000; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Apply Changes</button>
-                        </div>`);
-                    }
+                if (data.status === 'success' && data.response) {
+                    // Format response for display
+                    const formattedResponse = formatAIResponse(data.response);
+                    addChatMessage('ai', formattedResponse);
 
                     // Update history
                     chatHistory.push({ role: 'user', content: message });
                     chatHistory.push({ role: 'assistant', content: data.response });
                 } else {
-                    addChatMessage('ai', 'Sorry, I encountered an error. Please try again.');
+                    // API returned error, use fallback
+                    const fallbackResponse = generateLocalResponse(message, comp, currentChatSection);
+                    addChatMessage('ai', fallbackResponse);
+                    chatHistory.push({ role: 'user', content: message });
+                    chatHistory.push({ role: 'assistant', content: fallbackResponse });
                 }
             } catch (err) {
+                // Network error, use fallback
                 removeMessage(typingId);
-                // Fallback: provide a helpful response without backend
                 const fallbackResponse = generateLocalResponse(message, comp, currentChatSection);
                 addChatMessage('ai', fallbackResponse);
+                chatHistory.push({ role: 'user', content: message });
+                chatHistory.push({ role: 'assistant', content: fallbackResponse });
             }
         };
+
+        // Format AI response with markdown-like styling
+        function formatAIResponse(text) {
+            if (!text) return '';
+
+            let formatted = text;
+
+            // Escape HTML first to prevent XSS
+            formatted = formatted
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Code blocks (```...```)
+            formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+                return `<pre><code class="lang-${lang || 'text'}">${code.trim()}</code></pre>`;
+            });
+
+            // Inline code (`...`)
+            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Headers (### Header)
+            formatted = formatted.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+            formatted = formatted.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+            formatted = formatted.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+
+            // Bold (**text** or __text__)
+            formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+            // Italic (*text* or _text_)
+            formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+            // Bullet lists (- item or * item)
+            formatted = formatted.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+            formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+            // Numbered lists (1. item)
+            formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+            // Line breaks - convert double newlines to paragraphs
+            formatted = formatted.replace(/\n\n/g, '</p><p>');
+            formatted = formatted.replace(/\n/g, '<br>');
+
+            // Wrap in paragraph if not already wrapped
+            if (!formatted.startsWith('<')) {
+                formatted = '<p>' + formatted + '</p>';
+            }
+
+            // Clean up empty paragraphs
+            formatted = formatted.replace(/<p><\/p>/g, '');
+            formatted = formatted.replace(/<p><br>/g, '<p>');
+            formatted = formatted.replace(/<br><\/p>/g, '</p>');
+
+            return formatted;
+        }
 
         function addChatMessage(role, content, isTyping = false) {
             const messagesEl = document.getElementById('chatMessages');

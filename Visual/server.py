@@ -290,6 +290,32 @@ class AgenticHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({'status': 'error', 'message': str(e)}, 500)
             return
 
+        # PRD Chat - AI assistant for refining component designs
+        if parsed_path.path == '/api/chat':
+            if not USE_NEW_AGENTS:
+                self.send_json({'status': 'error', 'message': 'AI not available'}, 503)
+                return
+
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                message = data.get('message', '')
+                component = data.get('component', {})
+                section = data.get('section')  # Which PRD section is focused
+                history = data.get('history', [])
+
+                print(f"[Server] PRD Chat: {message[:50]}... (section: {section})")
+
+                result = self._prd_chat(message, component, section, history)
+                self.send_json(result)
+
+            except Exception as e:
+                print(f"[Server] PRD Chat error: {e}")
+                traceback.print_exc()
+                self.send_json({'status': 'error', 'message': str(e)}, 500)
+            return
+
         # Approve design and advance phase
         if parsed_path.path.startswith('/api/projects/') and parsed_path.path.endswith('/approve'):
             if not USE_NEW_AGENTS or not api:
@@ -547,6 +573,91 @@ Return ONLY valid JSON."""
             return {"error": f"AI call failed: {e.stderr}"}
         except Exception as e:
             return {"error": str(e)}
+
+    def _prd_chat(self, message: str, component: dict, section: str, history: list) -> dict:
+        """AI chat for PRD refinement in Architecture.html."""
+        import subprocess
+
+        # Build component context
+        comp_context = f"""
+COMPONENT: {component.get('label', 'Unknown')} ({component.get('type', 'service')})
+
+PROBLEM: {component.get('problem', 'Not defined')}
+SUMMARY: {component.get('summary', 'Not defined')}
+
+GOALS:
+{chr(10).join('- ' + g for g in component.get('goals', ['None defined']))}
+
+REQUIREMENTS:
+{chr(10).join('- ' + r for r in component.get('requirements', ['None defined']))}
+
+INPUTS: {', '.join(component.get('inputs', ['None'])) or 'None'}
+OUTPUTS: {', '.join(component.get('outputs', ['None'])) or 'None'}
+
+RISKS:
+{chr(10).join('- ' + r for r in component.get('risks', ['None identified']))}
+
+DEPENDENCIES:
+- Upstream: {', '.join(component.get('dependencies', {}).get('upstream', [])) or 'None'}
+- Downstream: {', '.join(component.get('dependencies', {}).get('downstream', [])) or 'None'}
+"""
+
+        # Section-specific focus
+        section_focus = ""
+        if section:
+            section_prompts = {
+                'overview': "Focus on the problem statement and summary. Help clarify what this component does and why.",
+                'scope': "Focus on what should be IN scope vs OUT of scope. Help define clear boundaries.",
+                'interface': "Focus on inputs, outputs, and method signatures. Help define the API contract.",
+                'dependencies': "Focus on upstream and downstream dependencies. Help identify what this component needs and provides.",
+                'acceptance': "Focus on acceptance criteria, edge cases, and error handling requirements.",
+                'metrics': "Focus on success metrics and how to measure them.",
+                'implementation': "Focus on implementation steps and technical approach.",
+                'testing': "Focus on test cases and testing strategy.",
+                'files': "Focus on file structure and naming conventions."
+            }
+            section_focus = f"\n\nFOCUS AREA: {section.upper()}\n{section_prompts.get(section, '')}"
+
+        # Build conversation history
+        history_text = ""
+        for h in history[-4:]:  # Last 4 messages
+            role = h.get('role', 'user')
+            history_text += f"{role.upper()}: {h.get('content', '')}\n\n"
+
+        prompt = f"""You are a senior software architect helping refine a component design (PRD-lite format).
+
+{comp_context}
+{section_focus}
+
+CONVERSATION:
+{history_text}
+USER: {message}
+
+INSTRUCTIONS:
+1. Provide specific, actionable advice for this component
+2. Reference the component's actual goals, requirements, and context
+3. If suggesting additions, be concrete (e.g., specific edge cases, specific test names)
+4. Keep responses concise but thorough
+5. Format with bullet points for readability
+
+Respond directly and helpfully. Do not use JSON format - just natural text with good formatting."""
+
+        try:
+            cmd = ['claude', '-p', prompt, '--dangerously-skip-permissions']
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=60)
+            response = result.stdout.strip()
+
+            return {
+                'status': 'success',
+                'response': response
+            }
+
+        except subprocess.TimeoutExpired:
+            return {'status': 'error', 'response': 'Request timed out. Please try again.'}
+        except subprocess.CalledProcessError as e:
+            return {'status': 'error', 'response': f'AI error: {e.stderr[:200] if e.stderr else "Unknown error"}'}
+        except Exception as e:
+            return {'status': 'error', 'response': f'Error: {str(e)}'}
 
     def do_GET(self):
         """Handle API GET calls."""
