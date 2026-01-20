@@ -3193,35 +3193,34 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
             btn.disabled = true;
 
             try {
-                // First approve the design
-                const approveResponse = await fetch(`/api/projects/${projectId}/approve`, {
+                // Approve design - this also triggers GM phase automatically
+                const response = await fetch(`/api/projects/${projectId}/approve`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
 
-                if (!approveResponse.ok) {
-                    throw new Error('Failed to approve design');
-                }
-
-                // Then start GM phase
-                const gmResponse = await fetch(`/api/projects/${projectId}/start-gm`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                const data = await gmResponse.json();
+                const data = await response.json();
 
                 if (data.status === 'success') {
-                    const goToGM = confirm(`GM Phase Complete!\n\nCreated build plans for ${data.work_plan.total_components} components.\n\nExecution order:\n${data.work_plan.execution_order.map((o, i) => `${i+1}. ${o.label}`).join('\n')}\n\nGo to GM Dashboard to view details?`);
+                    // Check if GM was triggered and successful
+                    if (data.gm_status === 'success' && data.work_plan) {
+                        const goToGM = confirm(`GM Phase Complete!\n\nCreated build plans for ${data.work_plan.total_components} components.\n\nExecution order:\n${data.work_plan.execution_order.map((o, i) => `${i+1}. ${o.label}`).join('\n')}\n\nGo to GM Dashboard to view details?`);
 
-                    if (goToGM) {
+                        if (goToGM) {
+                            window.location.href = `GM.html?project=${projectId}`;
+                        } else {
+                            loadArchitecture(projectId);
+                        }
+                    } else if (data.gm_status === 'error') {
+                        alert(`Phase advanced but GM failed: ${data.gm_error}\n\nYou can retry from the GM Dashboard.`);
                         window.location.href = `GM.html?project=${projectId}`;
                     } else {
-                        // Reload to show updated component data
+                        // Phase advanced but not to planning (shouldn't happen from this button)
+                        alert(`Phase advanced to: ${data.new_phase}`);
                         loadArchitecture(projectId);
                     }
                 } else {
-                    throw new Error(data.message || 'GM phase failed');
+                    throw new Error(data.message || 'Failed to approve design');
                 }
             } catch (err) {
                 console.error('GM phase error:', err);

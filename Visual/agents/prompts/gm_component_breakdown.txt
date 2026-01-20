@@ -21,7 +21,7 @@ PRINCIPLES:
 
 OUTPUT FORMAT (JSON):
 {{
-    "component_id": "{component_id}",
+    "component_id": "<use the component id from above>",
     "summary": "Brief description of this component's purpose",
 
     "files": [

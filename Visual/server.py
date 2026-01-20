@@ -339,7 +339,7 @@ class AgenticHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({'status': 'error', 'message': str(e)}, 500)
             return
 
-        # Approve design and advance phase
+        # Approve design and advance phase (also triggers GM if moving to planning phase)
         if parsed_path.path.startswith('/api/projects/') and parsed_path.path.endswith('/approve'):
             if not USE_NEW_AGENTS or not api:
                 self.send_json({'status': 'error', 'message': 'Database not available'}, 503)
@@ -354,6 +354,22 @@ class AgenticHandler(http.server.SimpleHTTPRequestHandler):
 
             print(f"[Server] Approving design for project {project_id}...")
             result = api.approve_design(project_id)
+
+            # If advancing to planning phase, also run GM agent
+            if result.get('status') == 'success' and result.get('new_phase') == 'planning':
+                try:
+                    print(f"[Server] Auto-triggering GM phase...")
+                    from agents import GeneralManagerAgent
+                    gm = GeneralManagerAgent(db)
+                    work_plan = gm.execute(project_id)
+                    result['work_plan'] = work_plan
+                    result['gm_status'] = 'success'
+                except Exception as e:
+                    print(f"[Server] GM phase error: {e}")
+                    traceback.print_exc()
+                    result['gm_status'] = 'error'
+                    result['gm_error'] = str(e)
+
             self.send_json(result)
             return
 
