@@ -71,10 +71,11 @@ KEY FUNCTIONS:
             max-width: 700px;
             border-right: 1px solid var(--border-color);
             background: var(--bg-color);
+            font-size: 16px;
         }
 
         .right-pane {
-            flex: 1.2;
+            flex: 2;
             background-image: radial-gradient(#222 1px, transparent 1px);
             background-size: 20px 20px;
             background-color: #0a0c0f;
@@ -82,6 +83,7 @@ KEY FUNCTIONS:
             display: flex;
             flex-direction: column;
             position: relative;
+            min-width: 500px;
         }
 
         .right-pane-header {
@@ -119,6 +121,7 @@ KEY FUNCTIONS:
             overflow: hidden;
             position: relative;
             cursor: grab;
+            min-height: 400px;
         }
 
         #mermaid-container:active {
@@ -255,7 +258,7 @@ KEY FUNCTIONS:
             color: var(--text-muted);
             margin: 0 0 15px 0;
             line-height: 1.6;
-            font-size: 13px;
+            font-size: 15px;
         }
 
         /* Input Styles */
@@ -266,7 +269,7 @@ KEY FUNCTIONS:
             color: var(--text-color);
             padding: 12px;
             font-family: var(--font-mono);
-            font-size: 12px;
+            font-size: 15px;
             border-radius: 4px;
             resize: vertical;
             outline: none;
@@ -289,7 +292,7 @@ KEY FUNCTIONS:
             border: 1px solid var(--border-light);
             color: var(--text-color);
             padding: 10px 12px;
-            font-size: 13px;
+            font-size: 15px;
             border-radius: 4px;
             outline: none;
             font-family: var(--font-main);
@@ -368,7 +371,7 @@ KEY FUNCTIONS:
         .question-item label {
             display: block;
             color: var(--text-color);
-            font-size: 12px;
+            font-size: 15px;
             margin-bottom: 8px;
             line-height: 1.4;
         }
@@ -460,7 +463,7 @@ KEY FUNCTIONS:
 
         .summary-section h4 {
             color: var(--text-muted);
-            font-size: 10px;
+            font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin: 0 0 8px 0;
@@ -469,7 +472,7 @@ KEY FUNCTIONS:
         .summary-section p {
             color: var(--text-color);
             margin: 0;
-            font-size: 13px;
+            font-size: 15px;
             line-height: 1.5;
         }
 
@@ -628,6 +631,94 @@ KEY FUNCTIONS:
             color: var(--accent-color);
             box-shadow: 0 0 12px rgba(0, 255, 204, 0.25);
         }
+
+        .component-tag.new {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .component-tag.new::after {
+            content: ' +';
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        .component-tag.modified {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .component-tag.modified::after {
+            content: ' *';
+            color: #f59e0b;
+        }
+
+        /* Changes Section */
+        .changes-section {
+            background: rgba(59, 130, 246, 0.05);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .changes-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .change-category {
+            padding: 10px 12px;
+            border-radius: 6px;
+        }
+
+        .change-category.added {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 3px solid #22c55e;
+        }
+
+        .change-category.modified {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid #f59e0b;
+        }
+
+        .change-category.removed {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+        }
+
+        .change-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .change-category.added .change-label { color: #22c55e; }
+        .change-category.modified .change-label { color: #f59e0b; }
+        .change-category.removed .change-label { color: #ef4444; }
+
+        .change-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .change-item {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .change-category.added .change-item { color: #4ade80; }
+        .change-category.modified .change-item { color: #fbbf24; }
+        .change-category.removed .change-item { color: #f87171; text-decoration: line-through; }
 
         /* Loading Overlay */
         #loading-overlay {
@@ -2431,6 +2522,27 @@ KEY FUNCTIONS:
                     <span class="iteration-badge" id="iterationBadge">Round 1</span>
                 </h2>
 
+                <!-- Changes This Round -->
+                <div class="summary-section changes-section" id="changesSection" style="display: none;">
+                    <h4>
+                        <span style="color: #3b82f6;">Changes This Round</span>
+                    </h4>
+                    <div class="changes-grid" id="changesGrid">
+                        <div class="change-category added" id="changesAdded" style="display: none;">
+                            <span class="change-label">+ Added</span>
+                            <div class="change-items" id="addedItems"></div>
+                        </div>
+                        <div class="change-category modified" id="changesModified" style="display: none;">
+                            <span class="change-label">~ Modified</span>
+                            <div class="change-items" id="modifiedItems"></div>
+                        </div>
+                        <div class="change-category removed" id="changesRemoved" style="display: none;">
+                            <span class="change-label">- Removed</span>
+                            <div class="change-items" id="removedItems"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Current Understanding -->
                 <div class="summary-section">
                     <h4>Current Understanding</h4>
@@ -2439,7 +2551,7 @@ KEY FUNCTIONS:
 
                 <!-- Components Found -->
                 <div class="summary-section">
-                    <h4>Components Identified</h4>
+                    <h4>Components (<span id="clarifyComponentCount">0</span>)</h4>
                     <div class="components-preview" id="componentsPreview"></div>
                 </div>
 
@@ -2651,6 +2763,8 @@ KEY FUNCTIONS:
         let hasUnsavedChanges = false;
         let originalComponentData = null;
         let explanationCache = {}; // Cache AI explanations
+        let originalComponentIds = new Set(); // Track components from initial analysis
+        let previousBrief = null; // Track previous state for comparison
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -3216,7 +3330,7 @@ KEY FUNCTIONS:
             }
         }
 
-        // Set up submenu button handlers
+        // Set up submenu button handlers and keyboard shortcuts
         document.addEventListener('DOMContentLoaded', () => {
             const btnViewDetails = document.getElementById('btn-view-details');
             const btnAskAI = document.getElementById('btn-ask-ai');
@@ -3236,6 +3350,29 @@ KEY FUNCTIONS:
                     e.preventDefault();
                     console.log('[btn-ask-ai] Clicked!');
                     askAIAboutComponent();
+                });
+            }
+
+            // Enter key to submit during interview phase
+            const promptInput = document.getElementById('promptInput');
+            if (promptInput) {
+                promptInput.addEventListener('keydown', (e) => {
+                    // Enter without Shift submits, Shift+Enter creates new line
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        submitInterview();
+                    }
+                });
+            }
+
+            // Enter key to submit clarifying questions answers
+            const questionsList = document.getElementById('questionsList');
+            if (questionsList) {
+                questionsList.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && e.target.tagName === 'INPUT') {
+                        e.preventDefault();
+                        submitAnswers();
+                    }
                 });
             }
         });
@@ -4238,7 +4375,15 @@ KEY FUNCTIONS:
         // Helper to create clickable component tags
         function createComponentTag(comp) {
             const tag = document.createElement('span');
-            tag.className = 'component-tag' + (comp.type === 'root' ? ' root' : '');
+            let classes = 'component-tag';
+            if (comp.type === 'root') classes += ' root';
+
+            // Check if this is a new component (added after initial analysis)
+            if (originalComponentIds.size > 0 && !originalComponentIds.has(comp.id)) {
+                classes += ' new';
+            }
+
+            tag.className = classes;
             tag.textContent = comp.label;
             tag.dataset.id = comp.id;
 
@@ -4506,6 +4651,11 @@ KEY FUNCTIONS:
                     console.log('[Interview] Final currentBrief:', currentBrief);
                     currentProjectId = result.data.project_id || currentBrief?.project_id;
 
+                    // Save original component IDs for tracking new additions
+                    originalComponentIds.clear();
+                    (currentBrief?.components || []).forEach(c => originalComponentIds.add(c.id));
+                    previousBrief = JSON.parse(JSON.stringify(currentBrief));
+
                     const compCount = (currentBrief?.components || []).length;
                     const questCount = (currentBrief?.questions || []).length;
 
@@ -4607,11 +4757,88 @@ KEY FUNCTIONS:
                 const iterationBadge = document.getElementById('iterationBadge');
                 if (iterationBadge) iterationBadge.textContent = `Round ${iteration + 1}`;
 
+                // Calculate changes from previous brief
+                const changesSection = document.getElementById('changesSection');
+                const addedItems = document.getElementById('addedItems');
+                const modifiedItems = document.getElementById('modifiedItems');
+                const removedItems = document.getElementById('removedItems');
+                const changesAdded = document.getElementById('changesAdded');
+                const changesModified = document.getElementById('changesModified');
+                const changesRemoved = document.getElementById('changesRemoved');
+
+                if (previousBrief && changesSection) {
+                    const prevComponents = new Map((previousBrief.components || []).map(c => [c.id, c]));
+                    const currComponents = new Map((currentBrief.components || []).map(c => [c.id, c]));
+
+                    const added = [];
+                    const modified = [];
+                    const removed = [];
+
+                    // Find added and modified
+                    currComponents.forEach((comp, id) => {
+                        if (!prevComponents.has(id)) {
+                            added.push(comp.label || id);
+                        } else {
+                            const prev = prevComponents.get(id);
+                            // Check if modified (compare key fields)
+                            if (prev.label !== comp.label ||
+                                prev.problem_statement !== comp.problem_statement ||
+                                JSON.stringify(prev.goals || []) !== JSON.stringify(comp.goals || [])) {
+                                modified.push(comp.label || id);
+                            }
+                        }
+                    });
+
+                    // Find removed
+                    prevComponents.forEach((comp, id) => {
+                        if (!currComponents.has(id)) {
+                            removed.push(comp.label || id);
+                        }
+                    });
+
+                    // Show changes section if there are any changes
+                    if (added.length > 0 || modified.length > 0 || removed.length > 0) {
+                        changesSection.style.display = 'block';
+
+                        // Populate added
+                        if (added.length > 0 && addedItems && changesAdded) {
+                            addedItems.innerHTML = added.map(name => `<span class="change-item">${name}</span>`).join('');
+                            changesAdded.style.display = 'block';
+                        } else if (changesAdded) {
+                            changesAdded.style.display = 'none';
+                        }
+
+                        // Populate modified
+                        if (modified.length > 0 && modifiedItems && changesModified) {
+                            modifiedItems.innerHTML = modified.map(name => `<span class="change-item">${name}</span>`).join('');
+                            changesModified.style.display = 'block';
+                        } else if (changesModified) {
+                            changesModified.style.display = 'none';
+                        }
+
+                        // Populate removed
+                        if (removed.length > 0 && removedItems && changesRemoved) {
+                            removedItems.innerHTML = removed.map(name => `<span class="change-item">${name}</span>`).join('');
+                            changesRemoved.style.display = 'block';
+                        } else if (changesRemoved) {
+                            changesRemoved.style.display = 'none';
+                        }
+                    } else {
+                        changesSection.style.display = 'none';
+                    }
+                } else if (changesSection) {
+                    changesSection.style.display = 'none';
+                }
+
                 // Summary
                 const summaryEl = document.getElementById('currentSummary');
                 if (summaryEl) summaryEl.textContent = currentBrief.summary || 'No summary available';
 
-                // Components (clickable)
+                // Component count
+                const componentCount = document.getElementById('clarifyComponentCount');
+                if (componentCount) componentCount.textContent = (currentBrief.components || []).length;
+
+                // Components tags (clickable)
                 const componentsDiv = document.getElementById('componentsPreview');
                 if (componentsDiv) {
                     componentsDiv.innerHTML = '';
@@ -4701,6 +4928,9 @@ KEY FUNCTIONS:
             // Show activity in log
             addLogEntry('info', `Processing ${Object.keys(document.querySelectorAll('#questionsList input')).length} answers...`);
             addLogEntry('thinking', 'Incorporating your feedback...', true);
+
+            // Save current state for change tracking
+            previousBrief = JSON.parse(JSON.stringify(currentBrief));
 
             // Collect answers
             const answers = {};
