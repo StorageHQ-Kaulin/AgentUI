@@ -1,0 +1,4216 @@
+<!--
+================================================================================
+                                   GLOSSARY
+================================================================================
+PURPOSE:
+    Conversational interview interface for project analysis. Supports multi-turn
+    refinement through clarifying questions and answers.
+
+USER INPUTS:
+    - Initial project description
+    - Answers to clarifying questions
+    - Additional context during refinement
+
+OUTPUTS:
+    - Structured project brief with components
+    - Visual architecture ready for Graph.html
+
+KEY FUNCTIONS:
+    - submitInterview(): Initial project analysis
+    - submitAnswers(): Refine with user answers
+    - proceedToDesign(): Move to visualization phase
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Interview</title>
+    <style>
+        :root {
+            --bg-color: #0b0d10;
+            --panel-bg: rgba(16, 20, 24, 0.95);
+            --card-bg: #0f1216;
+            --accent-color: #00ffcc;
+            --accent-warn: #ffaa00;
+            --accent-error: #ff4444;
+            --accent-success: #2ecc71;
+            --text-color: #e0e0e0;
+            --text-muted: #888;
+            --border-color: #333;
+            --border-light: #222;
+            --font-mono: 'Consolas', 'Monaco', monospace;
+            --font-main: 'Segoe UI', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .app-layout {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .left-pane {
+            flex: 1;
+            padding: 20px 30px;
+            overflow-y: auto;
+            max-width: 700px;
+            border-right: 1px solid var(--border-color);
+            background: var(--bg-color);
+        }
+
+        .right-pane {
+            flex: 1.2;
+            background-image: radial-gradient(#222 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-color: #0a0c0f;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .right-pane-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .right-pane-title {
+            color: var(--accent-color);
+            margin: 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
+        }
+
+        /* Mermaid Diagram */
+        #mermaid-container {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        h1 {
+            color: var(--accent-color);
+            margin: 0;
+            text-transform: uppercase;
+            font-size: 24px;
+            letter-spacing: 3px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        /* Phase Indicator */
+        .phase-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 25px;
+        }
+
+        .phase {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: var(--card-bg);
+            color: #555;
+            border: 1px solid var(--border-light);
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .phase.active {
+            background: rgba(0, 255, 204, 0.1);
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+        }
+
+        .phase.complete {
+            background: rgba(46, 204, 113, 0.1);
+            color: var(--accent-success);
+            border-color: var(--accent-success);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--panel-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--accent-color);
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            color: var(--accent-color);
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            margin: 0 0 15px 0;
+            line-height: 1.6;
+            font-size: 13px;
+        }
+
+        /* Input Styles */
+        textarea {
+            width: 100%;
+            background: #0a0c0f;
+            border: 1px solid var(--border-light);
+            color: var(--text-color);
+            padding: 12px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            border-radius: 4px;
+            resize: vertical;
+            outline: none;
+            min-height: 100px;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 1px rgba(0, 255, 204, 0.1);
+        }
+
+        textarea::placeholder {
+            color: #555;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: #0a0c0f;
+            border: 1px solid var(--border-light);
+            color: var(--text-color);
+            padding: 10px 12px;
+            font-size: 13px;
+            border-radius: 4px;
+            outline: none;
+            font-family: var(--font-main);
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent-color);
+        }
+
+        input[type="text"]::placeholder {
+            color: #555;
+        }
+
+        /* Buttons */
+        button {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            background: #fff;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: var(--border-color);
+            color: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button.secondary {
+            background: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+        }
+
+        button.secondary:hover {
+            background: rgba(0, 255, 204, 0.1);
+        }
+
+        button.success {
+            background: var(--accent-success);
+        }
+
+        button.success:hover {
+            background: #27ae60;
+        }
+
+        /* Questions List */
+        .questions-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .question-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            border-left: 2px solid var(--accent-warn);
+            border-radius: 4px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+        }
+
+        .question-item label {
+            display: block;
+            color: var(--text-color);
+            font-size: 12px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .question-item input {
+            margin-top: 0;
+        }
+
+        /* Components Preview */
+        .components-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        /* Status Messages */
+        .status {
+            padding: 10px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 12px;
+            font-family: var(--font-mono);
+        }
+
+        .status.loading {
+            background: rgba(0, 255, 204, 0.1);
+            color: var(--accent-color);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+        }
+
+        .status.error {
+            background: rgba(255, 68, 68, 0.1);
+            color: var(--accent-error);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+        }
+
+        .status.success {
+            background: rgba(46, 204, 113, 0.1);
+            color: var(--accent-success);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        /* Ready Banner */
+        .ready-banner {
+            background: linear-gradient(135deg, rgba(46, 204, 113, 0.15) 0%, rgba(0, 255, 204, 0.1) 100%);
+            border: 1px solid var(--accent-success);
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .ready-banner h3 {
+            color: var(--accent-success);
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ready-banner p {
+            color: var(--text-muted);
+            margin: 0 0 15px 0;
+            font-size: 13px;
+        }
+
+        /* Iteration Badge */
+        .iteration-badge {
+            display: inline-block;
+            background: var(--card-bg);
+            color: var(--text-muted);
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-left: 8px;
+            font-family: var(--font-mono);
+            border: 1px solid var(--border-light);
+        }
+
+        /* Summary Section */
+        .summary-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+        }
+
+        .summary-section h4 {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 8px 0;
+        }
+
+        .summary-section p {
+            color: var(--text-color);
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none;
+        }
+
+        /* Button Row */
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        /* Risks */
+        .risks-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 0 0;
+        }
+
+        .risks-list li {
+            color: var(--accent-error);
+            font-size: 12px;
+            padding: 4px 0;
+            padding-left: 18px;
+            position: relative;
+        }
+
+        .risks-list li::before {
+            content: "⚠";
+            position: absolute;
+            left: 0;
+            font-size: 10px;
+        }
+
+        /* Activity Log */
+        #activity-log {
+            background: #050508;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 10px 12px;
+            margin-top: 12px;
+            max-height: 180px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #151820;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: #444;
+            flex-shrink: 0;
+            font-size: 10px;
+        }
+
+        .log-icon {
+            flex-shrink: 0;
+            width: 14px;
+            text-align: center;
+        }
+
+        .log-message {
+            color: #777;
+        }
+
+        .log-entry.thinking .log-icon {
+            color: var(--accent-warn);
+        }
+
+        .log-entry.thinking .log-message {
+            color: var(--accent-warn);
+        }
+
+        .log-entry.success .log-icon {
+            color: var(--accent-success);
+        }
+
+        .log-entry.success .log-message {
+            color: var(--accent-success);
+        }
+
+        .log-entry.info .log-icon {
+            color: #3498db;
+        }
+
+        .log-entry.info .log-message {
+            color: #888;
+        }
+
+        .log-entry.error .log-icon {
+            color: var(--accent-error);
+        }
+
+        .log-entry.error .log-message {
+            color: var(--accent-error);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .log-entry.active .log-message {
+            animation: pulse 1.2s infinite;
+        }
+
+        /* Clickable Component Tags */
+        .component-tag {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 11px;
+            color: #bbb;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: var(--font-mono);
+        }
+
+        .component-tag:hover {
+            border-color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.08);
+            color: var(--text-color);
+            transform: translateY(-1px);
+        }
+
+        .component-tag.root {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .component-tag.selected {
+            border-color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.15);
+            color: var(--accent-color);
+            box-shadow: 0 0 12px rgba(0, 255, 204, 0.25);
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-title {
+            font-size: 18px;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .loading-status {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .loading-timer {
+            font-size: 24px;
+            color: var(--text-color);
+            font-family: var(--font-mono);
+        }
+
+        .loading-hint {
+            font-size: 11px;
+            color: #555;
+            margin-top: 15px;
+            max-width: 300px;
+        }
+
+        .loading-cancel {
+            margin-top: 20px;
+            background: transparent;
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .loading-cancel:hover {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        /* Button loading state */
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+        }
+
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin-left: -8px;
+            margin-top: -8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Detail Panel - Full Screen Two-Column Layout */
+        #detail-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            z-index: 2000;
+            flex-direction: column;
+        }
+
+        #detail-panel[style*="block"] {
+            display: flex;
+        }
+
+        .panel-header {
+            padding: 15px 30px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(0, 255, 204, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+            flex-shrink: 0;
+        }
+
+        .panel-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .panel-title {
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--text-color);
+        }
+
+        .panel-subtitle {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .panel-close {
+            cursor: pointer;
+            color: #555;
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.15s;
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+        }
+
+        .panel-close:hover {
+            color: white;
+            background: var(--border-color);
+            border-color: var(--accent-color);
+        }
+
+        .panel-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            min-height: 0; /* Important for flex children to scroll */
+        }
+
+        /* Left Panel - Chat */
+        .panel-left {
+            width: 45%;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .chat-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border-light);
+            background: linear-gradient(180deg, rgba(0, 255, 204, 0.03) 0%, transparent 100%);
+        }
+
+        .chat-header h3 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .chat-header p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-height: 0; /* Important for flex scroll */
+        }
+
+        .chat-message {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .chat-message.user {
+            background: rgba(0, 255, 204, 0.15);
+            border: 1px solid rgba(0, 255, 204, 0.2);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.ai {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.ai .message-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .chat-message.system {
+            background: rgba(255, 170, 0, 0.1);
+            border: 1px solid rgba(255, 170, 0, 0.2);
+            color: var(--accent-warn);
+            align-self: center;
+            font-size: 11px;
+            padding: 10px 18px;
+        }
+
+        .chat-message .action-taken {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+            font-size: 11px;
+            color: var(--accent-success);
+        }
+
+        .chat-message .action-taken::before {
+            content: '✓ ';
+        }
+
+        .chat-input-area {
+            padding: 20px 25px;
+            border-top: 1px solid var(--border-light);
+            background: var(--card-bg);
+        }
+
+        .chat-suggestions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .chat-suggestion {
+            background: transparent;
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            font-size: 11px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .chat-suggestion:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.05);
+        }
+
+        .chat-input-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: #0a0c0f;
+            border: 1px solid var(--border-light);
+            color: var(--text-color);
+            padding: 14px 18px;
+            font-size: 13px;
+            border-radius: 25px;
+            outline: none;
+        }
+
+        .chat-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .chat-send-btn {
+            background: var(--accent-color);
+            border: none;
+            color: #000;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-send-btn:hover {
+            background: #fff;
+        }
+
+        .chat-send-btn:disabled {
+            background: var(--border-color);
+            color: #555;
+        }
+
+        /* Right Panel - Details */
+        .panel-right {
+            width: 55%;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: #0a0c0f;
+            min-height: 0;
+            max-height: 100%;
+        }
+
+        .detail-hero {
+            padding: 30px;
+            background: linear-gradient(180deg, rgba(0, 255, 204, 0.03) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .detail-hero .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .detail-hero .component-type {
+            color: #555;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .detail-hero .summary-text {
+            font-size: 16px;
+            line-height: 1.8;
+            color: var(--text-color);
+            margin-bottom: 20px;
+        }
+
+        .detail-hero .problem-box {
+            background: rgba(255, 107, 107, 0.08);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            border-left: 3px solid #ff6b6b;
+            padding: 15px 18px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 20px;
+        }
+
+        .detail-hero .problem-box h4 {
+            color: #ff6b6b;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 8px 0;
+        }
+
+        .detail-hero .problem-box p {
+            color: #ccc;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .detail-hero .goals-box {
+            background: rgba(0, 255, 204, 0.05);
+            border: 1px solid rgba(0, 255, 204, 0.15);
+            border-left: 3px solid var(--accent-color);
+            padding: 15px 18px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .detail-hero .goals-box h4 {
+            color: var(--accent-color);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 10px 0;
+        }
+
+        .detail-hero .goals-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .detail-hero .goal-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #bbb;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .detail-hero .goal-item::before {
+            content: '◎';
+            color: var(--accent-color);
+            flex-shrink: 0;
+        }
+
+        /* Detail Sections Grid */
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: var(--border-light);
+            padding: 1px;
+            padding-bottom: 50px; /* Extra space at bottom for scrolling */
+        }
+
+        .detail-section {
+            background: var(--panel-bg);
+            padding: 20px 25px;
+        }
+
+        .detail-section.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .detail-section h4 {
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-section h4 .count {
+            background: var(--border-color);
+            color: var(--text-color);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        .detail-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .detail-list li {
+            padding: 8px 0;
+            color: #aaa;
+            font-size: 12px;
+            border-bottom: 1px solid #181a1f;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .detail-list li:last-child {
+            border-bottom: none;
+        }
+
+        .detail-list .bullet {
+            color: var(--accent-color);
+            flex-shrink: 0;
+        }
+
+        .detail-list .bullet.risk {
+            color: #e74c3c;
+        }
+
+        .detail-list .bullet.test {
+            color: var(--accent-success);
+        }
+
+        .detail-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-badge.pending {
+            background: rgba(243, 156, 18, 0.15);
+            color: var(--accent-warn);
+            border: 1px solid rgba(243, 156, 18, 0.3);
+        }
+
+        .detail-badge.active {
+            background: rgba(0, 255, 204, 0.15);
+            color: var(--accent-color);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+        }
+
+        .detail-badge.complete {
+            background: rgba(46, 204, 113, 0.15);
+            color: var(--accent-success);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        /* Data Flow Section */
+        .io-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .io-box {
+            flex: 1;
+            background: #080a0d;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 12px 15px;
+        }
+
+        .io-box h5 {
+            color: #555;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 8px 0;
+        }
+
+        .io-box ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .io-box li {
+            color: #888;
+            font-size: 11px;
+            padding: 4px 0;
+            font-family: var(--font-mono);
+        }
+
+        .io-box.inputs {
+            border-left: 3px solid #3498db;
+        }
+
+        .io-box.outputs {
+            border-left: 3px solid var(--accent-success);
+        }
+
+        /* Test Cases */
+        .test-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #181a1f;
+        }
+
+        .test-item:last-child {
+            border-bottom: none;
+        }
+
+        .test-type {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .test-type.unit {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .test-type.integration {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+        }
+
+        .test-type.e2e {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+
+        .test-priority {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .test-priority.high {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .test-priority.medium {
+            background: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
+        }
+
+        .test-priority.low {
+            background: rgba(149, 165, 166, 0.2);
+            color: #95a5a6;
+        }
+
+        .test-name {
+            flex: 1;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 12px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            animation: typing 1s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+
+            0%,
+            100% {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Scope items */
+        .scope-item {
+            padding: 6px 0;
+            font-size: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .scope-item.included {
+            color: var(--accent-success);
+        }
+
+        .scope-item.excluded {
+            color: #e74c3c;
+        }
+
+        .scope-item::before {
+            flex-shrink: 0;
+        }
+
+        .scope-item.included::before {
+            content: '✓';
+        }
+
+        .scope-item.excluded::before {
+            content: '✗';
+        }
+
+        /* Projects Panel */
+        #projects-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 400px;
+            max-height: calc(100vh - 40px);
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-left: 3px solid #3498db;
+            border-radius: 4px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        #projects-panel .panel-title {
+            color: #3498db;
+        }
+
+        #projects-list {
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+
+        .project-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .project-item:hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        .project-item:last-child {
+            border-bottom: none;
+        }
+
+        .project-item.active {
+            background: rgba(52, 152, 219, 0.15);
+            border-left: 2px solid #3498db;
+            margin-left: -2px;
+        }
+
+        .project-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+
+        .project-summary {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .project-meta {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+            font-size: 10px;
+            color: #555;
+            font-family: var(--font-mono);
+        }
+
+        .project-meta .phase {
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            text-transform: uppercase;
+        }
+
+        .project-meta .phase.interview {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .project-meta .phase.design {
+            color: #f39c12;
+            border-color: #f39c12;
+        }
+
+        .project-meta .phase.planning {
+            color: #9b59b6;
+            border-color: #9b59b6;
+        }
+
+        .project-item .delete-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.15s;
+            padding: 0;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .project-item {
+            position: relative;
+            padding-right: 45px;
+        }
+
+        .project-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .project-item .delete-btn:hover {
+            border-color: var(--accent-error);
+            color: var(--accent-error);
+            background: rgba(255, 68, 68, 0.1);
+        }
+
+        /* Explanation Tooltip (Mind-map style) */
+        .explain-tooltip {
+            position: fixed;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-color);
+            border-radius: 6px;
+            padding: 15px;
+            max-width: 350px;
+            z-index: 2000;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 204, 0.15);
+            animation: tooltipFadeIn 0.2s ease;
+        }
+
+        @keyframes tooltipFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .explain-tooltip::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 20px;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 8px solid var(--accent-color);
+        }
+
+        .explain-tooltip .tooltip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .explain-tooltip .tooltip-title {
+            color: var(--accent-color);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .explain-tooltip .tooltip-close {
+            cursor: pointer;
+            color: #555;
+            font-size: 16px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .explain-tooltip .tooltip-close:hover {
+            color: white;
+            background: var(--border-color);
+        }
+
+        .explain-tooltip .tooltip-content {
+            color: var(--text-color);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .explain-tooltip .tooltip-loading {
+            color: var(--accent-warn);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .explain-tooltip .tooltip-loading::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--accent-warn);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Explainable items */
+        .explainable {
+            cursor: help;
+            border-bottom: 1px dotted var(--accent-color);
+            transition: all 0.15s;
+        }
+
+        .explainable:hover {
+            color: var(--accent-color);
+            border-bottom-style: solid;
+        }
+
+        .explainable.risk {
+            border-bottom-color: var(--accent-error);
+        }
+
+        .explainable.risk:hover {
+            color: var(--accent-error);
+        }
+
+        /* Editable fields in detail panel */
+        .editable-field {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 3px;
+            padding: 4px 6px;
+            margin: -4px -6px;
+            color: inherit;
+            font: inherit;
+            width: calc(100% + 12px);
+            transition: all 0.15s;
+            resize: vertical;
+        }
+
+        .editable-field:hover {
+            border-color: var(--border-light);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .editable-field:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.05);
+        }
+
+        .editable-list-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .editable-list-item input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid transparent;
+            color: #aaa;
+            font-size: 11px;
+            padding: 2px 0;
+            outline: none;
+        }
+
+        .editable-list-item input:hover {
+            border-bottom-color: var(--border-light);
+        }
+
+        .editable-list-item input:focus {
+            border-bottom-color: var(--accent-color);
+            color: var(--text-color);
+        }
+
+        .add-item-btn {
+            background: transparent;
+            border: 1px dashed var(--border-light);
+            color: #555;
+            padding: 4px 10px;
+            font-size: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+            text-transform: uppercase;
+        }
+
+        .add-item-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.05);
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 15px;
+            border-top: 1px solid var(--border-light);
+            background: var(--card-bg);
+            position: sticky;
+            bottom: 0;
+        }
+
+        .panel-actions button {
+            flex: 1;
+            padding: 8px 12px;
+        }
+
+        .unsaved-indicator {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-warn);
+            border-radius: 50%;
+            display: none;
+            margin-left: 8px;
+        }
+
+        .unsaved-indicator.show {
+            display: inline-block;
+            animation: pulse 1s infinite;
+        }
+
+        .remove-item-btn {
+            background: transparent;
+            border: none;
+            color: #444;
+            cursor: pointer;
+            padding: 2px 4px;
+            font-size: 12px;
+            opacity: 0;
+            transition: all 0.15s;
+        }
+
+        .editable-list-item:hover .remove-item-btn {
+            opacity: 1;
+        }
+
+        .remove-item-btn:hover {
+            color: var(--accent-error);
+        }
+
+        /* Test Case Items */
+        .test-case-item {
+            background: #080a0d;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .test-case-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .test-type-select,
+        .test-priority-select {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .test-type-select:focus,
+        .test-priority-select:focus {
+            border-color: var(--accent-color);
+            outline: none;
+        }
+
+        .test-type-select {
+            min-width: 90px;
+        }
+
+        .test-priority-select {
+            min-width: 70px;
+        }
+
+        .test-priority-select option[value="high"] {
+            color: var(--accent-error);
+        }
+
+        .test-priority-select option[value="medium"] {
+            color: var(--accent-warn);
+        }
+
+        .test-priority-select option[value="low"] {
+            color: var(--text-muted);
+        }
+
+        .test-case-name {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-color);
+            font-size: 11px;
+            padding: 4px 0;
+            outline: none;
+        }
+
+        .test-case-name:focus {
+            border-bottom-color: var(--accent-color);
+        }
+
+        .test-case-item .remove-item-btn {
+            margin-left: auto;
+        }
+
+        /* AI Assistant Section */
+        .ai-assistant {
+            background: linear-gradient(135deg, rgba(0, 255, 204, 0.05) 0%, rgba(52, 152, 219, 0.05) 100%);
+            border: 1px solid rgba(0, 255, 204, 0.2);
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+
+        .ai-assistant-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .ai-assistant-header h4 {
+            margin: 0;
+            color: var(--accent-color);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ai-badge {
+            background: var(--accent-color);
+            color: #000;
+            font-size: 8px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: 700;
+        }
+
+        .ai-quick-actions {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .ai-action-btn {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 5px 10px;
+            font-size: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .ai-action-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            background: rgba(0, 255, 204, 0.1);
+        }
+
+        .ai-action-btn.loading {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .ai-action-btn .icon {
+            font-size: 12px;
+        }
+
+        .ai-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .ai-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-light);
+            color: var(--text-color);
+            padding: 8px 10px;
+            font-size: 11px;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .ai-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .ai-input::placeholder {
+            color: #555;
+        }
+
+        .ai-send-btn {
+            background: var(--accent-color);
+            border: none;
+            color: #000;
+            padding: 8px 14px;
+            font-size: 10px;
+            font-weight: 700;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .ai-send-btn:hover {
+            background: #fff;
+        }
+
+        .ai-send-btn:disabled {
+            background: var(--border-color);
+            color: #555;
+            cursor: not-allowed;
+        }
+
+        /* AI Response Area */
+        .ai-response {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .ai-response.show {
+            display: block;
+        }
+
+        .ai-response-content {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 11px;
+            line-height: 1.5;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .ai-response-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-warn);
+            padding: 15px;
+        }
+
+        .ai-response-loading::before {
+            content: '';
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--accent-warn);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .ai-suggestion-group {
+            margin-bottom: 12px;
+        }
+
+        .ai-suggestion-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .ai-suggestion-label {
+            color: var(--accent-color);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .ai-suggestion-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 6px 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .ai-suggestion-item:hover {
+            background: rgba(0, 255, 204, 0.1);
+        }
+
+        .ai-suggestion-item.added {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .ai-suggestion-item .add-icon {
+            color: var(--accent-success);
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .ai-suggestion-item .text {
+            flex: 1;
+            color: #bbb;
+        }
+
+        .ai-suggestion-item:hover .text {
+            color: var(--text-color);
+        }
+
+        .ai-answer {
+            color: var(--text-color);
+            white-space: pre-wrap;
+        }
+
+        .ai-code-block {
+            background: #000;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 8px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            overflow-x: auto;
+            color: var(--accent-color);
+        }
+
+        /* Mermaid Diagram Interactive Nodes */
+        #mermaid-container svg g.node {
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+
+        #mermaid-container svg g.node:hover {
+            filter: brightness(1.2) drop-shadow(0 0 4px rgba(0, 255, 204, 0.4));
+        }
+
+        #mermaid-container svg g.node.diagram-selected {
+            filter: brightness(1.2) drop-shadow(0 0 8px rgba(0, 255, 204, 0.6));
+        }
+
+        #mermaid-container svg .edgePath path {
+            stroke-width: 2px;
+        }
+
+        #mermaid-container svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark'
+        });
+        window.drawMermaid = async function (graphDefinition) {
+            console.log('[Mermaid] drawMermaid called with:', graphDefinition?.substring(0, 100));
+            const element = document.getElementById('mermaid-container');
+            if (!graphDefinition) {
+                console.log('[Mermaid] No graph definition provided');
+                element.innerHTML = '<p style="color:#666">No design generated yet</p>';
+                return;
+            }
+            try {
+                // Clear previous content and add new diagram
+                element.innerHTML = '';
+                const diagramDiv = document.createElement('div');
+                diagramDiv.className = 'mermaid';
+                diagramDiv.textContent = graphDefinition;
+                element.appendChild(diagramDiv);
+
+                console.log('[Mermaid] Running mermaid.run...');
+                await mermaid.run({
+                    nodes: [diagramDiv]
+                });
+                console.log('[Mermaid] Diagram rendered successfully');
+                // Add click handlers after diagram renders
+                setTimeout(() => window.addDiagramClickHandlers?.(), 150);
+            } catch (error) {
+                console.error('[Mermaid] Render error:', error);
+                element.innerHTML = '<p style="color:#e74c3c">Failed to load diagram: ' + error.message + '</p>';
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-content">
+            <div class="loading-title">Analyzing Project</div>
+            <div class="loading-status" id="loading-status">Connecting to Claude Opus...</div>
+            <div class="loading-timer" id="loading-timer">0:00</div>
+            <div class="loading-hint">Opus provides the highest quality analysis but takes 60-120 seconds</div>
+            <button class="loading-cancel" onclick="cancelAnalysis()">Cancel</button>
+        </div>
+    </div>
+
+    <div class="app-layout">
+        <!-- LEFT: Chat Interface -->
+        <div class="left-pane">
+            <header>
+                <h1>Project Interview</h1>
+                <p class="subtitle">Describe your project and refine it through conversation</p>
+                <div id="modelInfo"
+                    style="font-size: 10px; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label for="modelSelect"
+                            style="color: #555; text-transform: uppercase; letter-spacing: 0.5px;">Model</label>
+                        <select id="modelSelect" onchange="onModelChange()"
+                            style="background: var(--card-bg); color: var(--accent-color); border: 1px solid var(--border-light); padding: 5px 10px; border-radius: 3px; font-size: 10px; cursor: pointer; font-family: var(--font-mono);">
+                            <option value="claude-haiku-4-5-20251001">Haiku</option>
+                            <option value="claude-sonnet-4-5-20250929">Sonnet</option>
+                            <option value="claude-opus-4-5-20251101">Opus</option>
+                        </select>
+                    </div>
+                    <span style="color: #333;">|</span>
+                    <button onclick="toggleProjectPanel()"
+                        style="background: transparent; border: 1px solid var(--border-light); color: var(--text-muted); padding: 4px 10px; font-size: 10px; cursor: pointer;">
+                        Projects <span id="projectCount" style="color: var(--accent-color);">(0)</span>
+                    </button>
+                    <span style="color: #333;">|</span>
+                    <span style="color: #555;">Status: <span id="serverStatus"
+                            style="font-family: var(--font-mono);">...</span></span>
+                </div>
+            </header>
+
+            <!-- Phase Indicator -->
+            <div class="phase-indicator">
+                <span class="phase active" id="phase-describe">1. Describe</span>
+                <span class="phase" id="phase-clarify">2. Clarify</span>
+                <span class="phase" id="phase-review">3. Review</span>
+            </div>
+
+            <!-- Phase 1: Initial Description -->
+            <div id="section-describe" class="card">
+                <h2>Describe Your Project</h2>
+                <p>What do you want to build? Be as detailed or brief as you like - we'll ask clarifying questions.</p>
+
+                <textarea id="promptInput"
+                    placeholder="Example: I want to build a task management app where teams can create projects, assign tasks to members, set deadlines, and track progress. It should have a web interface and send email notifications..."></textarea>
+
+                <div class="button-row">
+                    <button onclick="submitInterview()" id="btnAnalyze">Analyze Project</button>
+                </div>
+
+                <div id="status-initial" class="status hidden"></div>
+
+                <!-- Activity Log -->
+                <div id="activity-log" class="hidden">
+                    <div id="log-entries"></div>
+                </div>
+            </div>
+
+            <!-- Phase 2: Questions & Answers -->
+            <div id="section-clarify" class="card hidden">
+                <h2>
+                    Clarifying Questions
+                    <span class="iteration-badge" id="iterationBadge">Round 1</span>
+                </h2>
+
+                <!-- Current Understanding -->
+                <div class="summary-section">
+                    <h4>Current Understanding</h4>
+                    <p id="currentSummary">Loading...</p>
+                </div>
+
+                <!-- Components Found -->
+                <div class="summary-section">
+                    <h4>Components Identified</h4>
+                    <div class="components-preview" id="componentsPreview"></div>
+                </div>
+
+                <!-- Risks Identified -->
+                <div class="summary-section" id="risksSection">
+                    <h4>Risks Identified</h4>
+                    <ul class="risks-list" id="risksList"></ul>
+                </div>
+
+                <!-- Questions -->
+                <div id="questionsContainer">
+                    <h4 style="color: #888; font-size: 12px; text-transform: uppercase; margin: 20px 0 15px 0;">
+                        Please Answer These Questions
+                    </h4>
+                    <ul class="questions-list" id="questionsList"></ul>
+                </div>
+
+                <!-- Additional Context -->
+                <div style="margin-top: 20px;">
+                    <label
+                        style="color: #888; font-size: 12px; text-transform: uppercase; display: block; margin-bottom: 8px;">
+                        Additional Information (Optional)
+                    </label>
+                    <textarea id="additionalContext" placeholder="Any other details you'd like to add..."
+                        style="min-height: 80px;"></textarea>
+                </div>
+
+                <div class="button-row">
+                    <button onclick="submitAnswers()" id="btnRefine">Refine Analysis</button>
+                    <button onclick="skipQuestions()" class="secondary">Skip & Proceed</button>
+                </div>
+
+                <div id="status-clarify" class="status hidden"></div>
+            </div>
+
+            <!-- Phase 3: Ready for Design -->
+            <div id="section-ready" class="card hidden">
+                <div class="ready-banner">
+                    <h3>Project Analysis Complete</h3>
+                    <p>Your project has been analyzed and is ready for the design phase.</p>
+                    <button onclick="proceedToDesign()" class="success">Proceed to Design</button>
+                </div>
+
+                <!-- Final Summary -->
+                <div class="summary-section">
+                    <h4>Project Summary</h4>
+                    <p id="finalSummary">Loading...</p>
+                </div>
+
+                <div class="summary-section">
+                    <h4>Final Components (<span id="componentCount">0</span>)</h4>
+                    <div class="components-preview" id="finalComponents"></div>
+                </div>
+
+                <div class="button-row">
+                    <button onclick="startOver()" class="secondary">Start Over</button>
+                    <button onclick="viewGraph()" class="secondary">View Graph</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Live Diagram -->
+        <div class="right-pane">
+            <div class="right-pane-header">
+                <h3 class="right-pane-title">Live Architecture</h3>
+                <div style="font-size: 10px; color: #555; font-family: var(--font-mono);">
+                    <span id="nodeCount">0</span> components
+                </div>
+            </div>
+            <div id="mermaid-container">
+                <p style="color: #444; font-size: 12px; font-family: var(--font-mono);">Diagram will appear after
+                    analysis...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Panel -->
+    <div id="projects-panel">
+        <div class="panel-header">
+            <div class="panel-title">Saved Projects</div>
+            <div class="panel-close" onclick="toggleProjectPanel()">×</div>
+        </div>
+        <div class="panel-content">
+            <div id="projects-list">
+                <p style="color: #555; font-size: 12px;">Loading projects...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Detail Panel - Full Screen Two-Column -->
+    <div id="detail-panel">
+        <div class="panel-header">
+            <div class="panel-header-left">
+                <span class="detail-badge" id="panel-status">PENDING</span>
+                <div class="panel-title" id="panel-title">Component Details</div>
+                <div class="panel-subtitle" id="panel-type">Node</div>
+            </div>
+            <div class="panel-close" onclick="closeDetailPanel()">×</div>
+        </div>
+        <div class="panel-content">
+            <!-- Left Panel - Chat -->
+            <div class="panel-left">
+                <div class="chat-header">
+                    <h3>AI Assistant</h3>
+                    <p>Ask questions about this component or request changes</p>
+                </div>
+                <div class="chat-section">
+                    <div class="chat-messages" id="chat-messages">
+                        <!-- Chat messages appear here -->
+                    </div>
+                    <div class="chat-input-area">
+                        <div class="chat-suggestions" id="chat-suggestions">
+                            <button class="chat-suggestion"
+                                onclick="sendChatMessage('Explain this component in detail')">Explain in detail</button>
+                            <button class="chat-suggestion"
+                                onclick="sendChatMessage('What are the main risks?')">Identify risks</button>
+                            <button class="chat-suggestion"
+                                onclick="sendChatMessage('Suggest test cases for this component')">Suggest
+                                tests</button>
+                            <button class="chat-suggestion"
+                                onclick="sendChatMessage('What requirements might be missing?')">Missing
+                                requirements</button>
+                        </div>
+                        <div class="chat-input-row">
+                            <input type="text" class="chat-input" id="chat-input"
+                                placeholder="Ask about this component or request changes..."
+                                onkeypress="if(event.key==='Enter' && !event.shiftKey) { sendChatMessage(); event.preventDefault(); }">
+                            <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">→</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Details -->
+            <div class="panel-right">
+                <!-- Hero Section -->
+                <div class="detail-hero" id="detail-hero">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Details Grid -->
+                <div class="detail-grid" id="detail-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentBrief = null;
+        let selectedComponentId = null;
+        let currentGraphData = null;
+        let selectedModel = 'claude-haiku-4-5-20251001'; // Default
+        let projectsList = [];
+        let currentProjectId = null;
+        let hasUnsavedChanges = false;
+        let originalComponentData = null;
+        let explanationCache = {}; // Cache AI explanations
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // Ensure panels are hidden on load
+                document.getElementById('detail-panel').style.display = 'none';
+                document.getElementById('projects-panel').style.display = 'none';
+
+                // Reset state
+                currentBrief = null;
+                selectedComponentId = null;
+                chatHistory = [];
+
+                // Default to Opus for highest quality analysis
+                selectedModel = 'claude-opus-4-5-20251101';
+                document.getElementById('modelSelect').value = selectedModel;
+                localStorage.setItem('selectedModel', selectedModel);
+                console.log('[Init] Model set to Opus for high-quality analysis');
+
+                // Check server and load projects
+                checkServerStatus();
+                loadProjects();
+            } catch (err) {
+                console.error('Initialization error:', err);
+            }
+
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    // Close detail panel if open
+                    const detailPanel = document.getElementById('detail-panel');
+                    if (detailPanel && detailPanel.style.display === 'block') {
+                        closeDetailPanel();
+                    }
+                    // Close projects panel if open
+                    const projectsPanel = document.getElementById('projects-panel');
+                    if (projectsPanel && projectsPanel.style.display === 'block') {
+                        projectsPanel.style.display = 'none';
+                    }
+                }
+            });
+        });
+
+        // Projects Panel Functions
+        function toggleProjectPanel() {
+            const panel = document.getElementById('projects-panel');
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+            } else {
+                panel.style.display = 'block';
+                loadProjects(); // Refresh list
+            }
+        }
+
+        async function loadProjects() {
+            console.log('[loadProjects] Fetching projects...');
+            try {
+                const response = await fetch('/api/projects');
+                const data = await response.json();
+                console.log('[loadProjects] Response:', data);
+
+                if (data.status === 'success') {
+                    projectsList = data.projects || [];
+                    console.log('[loadProjects] Found', projectsList.length, 'projects');
+                    document.getElementById('projectCount').textContent = `(${projectsList.length})`;
+                    renderProjectsList();
+                }
+            } catch (err) {
+                console.error('[loadProjects] Failed to load projects:', err);
+            }
+        }
+
+        function renderProjectsList() {
+            const container = document.getElementById('projects-list');
+
+            if (projectsList.length === 0) {
+                container.innerHTML = '<p style="color: #555; font-size: 12px; padding: 10px;">No projects yet. Start an interview to create one.</p>';
+                return;
+            }
+
+            container.innerHTML = projectsList.map(proj => `
+                <div class="project-item ${proj.id === currentProjectId ? 'active' : ''}" onclick="loadProject('${proj.id}')">
+                    <div class="project-name">${escapeHtml(proj.name)}</div>
+                    <div class="project-summary">${escapeHtml(proj.summary || 'No summary')}</div>
+                    <div class="project-meta">
+                        <span class="phase ${proj.phase}">${proj.phase}</span>
+                        <span>${formatDate(proj.created_at)}</span>
+                    </div>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteProject('${proj.id}', '${escapeHtml(proj.name)}')" title="Delete project">×</button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteProject(projectId, projectName) {
+            if (!confirm(`Delete "${projectName}"?\n\nThis will permanently remove the project and all its data.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    addLogEntry('success', `Deleted project: ${projectName}`);
+
+                    // If we deleted the current project, reset state
+                    if (currentProjectId === projectId) {
+                        currentProjectId = null;
+                        currentBrief = null;
+                        currentGraphData = null;
+                        startOver();
+                    }
+
+                    // Refresh projects list
+                    await loadProjects();
+                } else {
+                    addLogEntry('error', `Failed to delete: ${result.message}`);
+                }
+            } catch (err) {
+                addLogEntry('error', `Delete error: ${err.message}`);
+            }
+        }
+
+        async function loadProject(projectId) {
+            addLogEntry('info', `Loading project ${projectId.slice(0, 12)}...`);
+
+            try {
+                const response = await fetch(`/api/project/${projectId}`);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    currentProjectId = projectId;
+                    currentGraphData = result.data;
+
+                    // Reconstruct brief from graph data
+                    currentBrief = {
+                        project_id: projectId,
+                        title: result.data.projectName,
+                        summary: result.data.projectSummary,
+                        components: (result.data.nodes || []).map(n => ({
+                            id: n.id,
+                            label: n.label,
+                            type: n.type,
+                            status: n.status,
+                            summary: n.summary,
+                            problem: n.problem,
+                            goals: n.goals || [],
+                            requirements: n.requirements || [],
+                            risks: n.risks || [],
+                            inputs: n.inputs || [],
+                            outputs: n.outputs || []
+                        })),
+                        edges: result.data.edges || [],
+                        global_requirements: result.data.globalTasks?.map(t => t.text) || [],
+                        questions: result.data.questions || (result.data.brief ? result.data.brief.questions : []) || []
+                    };
+
+                    // Update UI
+                    document.getElementById('nodeCount').textContent = currentBrief.components.length;
+
+                    // Generate mermaid diagram
+                    const mermaidCode = generateMermaidFromBrief(currentBrief);
+                    if (mermaidCode) {
+                        const tryDraw = (attempts = 0) => {
+                            if (window.drawMermaid) {
+                                window.drawMermaid(mermaidCode);
+                            } else if (attempts < 10) {
+                                setTimeout(() => tryDraw(attempts + 1), 200);
+                            }
+                        };
+                        tryDraw();
+                    }
+
+                    // Check if we should show clarify phase (if we have questions)
+                    if (currentBrief.questions && currentBrief.questions.length > 0) {
+                        console.log('[LoadProject] Found questions, showing clarify phase');
+                        showClarifyPhase();
+                    } else {
+                        // Show ready phase with loaded project
+                        showReadyPhase();
+                    }
+
+                    addLogEntry('success', `Loaded: ${result.data.projectName}`);
+
+                    // Update projects list to show active
+                    renderProjectsList();
+
+                    // Close panel
+                    document.getElementById('projects-panel').style.display = 'none';
+
+                } else {
+                    addLogEntry('error', 'Failed to load project');
+                }
+            } catch (err) {
+                addLogEntry('error', `Error: ${err.message}`);
+            }
+        }
+
+        function generateMermaidFromBrief(brief) {
+            console.log('[generateMermaid] Called with brief:', brief);
+            if (!brief?.components?.length) {
+                console.log('[generateMermaid] No components found');
+                return null;
+            }
+
+            let code = 'graph TD\n';
+
+            // Build a map of original IDs to safe IDs
+            const idMap = {};
+            const validIds = new Set();
+
+            // Add nodes
+            brief.components.forEach(comp => {
+                const safeId = comp.id.replace(/[^a-zA-Z0-9]/g, '_');
+                idMap[comp.id] = safeId;
+                validIds.add(safeId);
+                // Escape special characters in labels
+                const label = (comp.label || 'Component')
+                    .replace(/"/g, "'")
+                    .replace(/\[/g, '(')
+                    .replace(/\]/g, ')')
+                    .replace(/[<>]/g, '');
+                code += `    ${safeId}["${label}"]\n`;
+            });
+
+            // Add edges - only if both nodes exist
+            (brief.edges || []).forEach(edge => {
+                if (!edge.from || !edge.to) return;
+
+                const fromId = idMap[edge.from] || edge.from.replace(/[^a-zA-Z0-9]/g, '_');
+                const toId = idMap[edge.to] || edge.to.replace(/[^a-zA-Z0-9]/g, '_');
+
+                // Only add edge if both nodes exist
+                if (validIds.has(fromId) && validIds.has(toId)) {
+                    // Generate edge label
+                    var edgeLabel = edge.label ? ("|" + String(edge.label).replace(/["']/g, "").substring(0, 30) + "|") : "";
+
+                    code += '    ' + fromId + ' -->' + edgeLabel + ' ' + toId + '\n';
+                } else {
+                    console.log('[generateMermaid] Skipping edge - node not found:', edge);
+                }
+            });
+
+            console.log('[generateMermaid] Generated code:', code);
+            return code;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function onModelChange() {
+            const select = document.getElementById('modelSelect');
+            selectedModel = select.value;
+            localStorage.setItem('selectedModel', selectedModel);
+            console.log('Model changed to:', selectedModel);
+        }
+
+        function getSelectedModel() {
+            return document.getElementById('modelSelect').value;
+        }
+
+        // Activity Log Functions
+        function clearActivityLog() {
+            document.getElementById('log-entries').innerHTML = '';
+        }
+
+        function addLogEntry(type, message, isActive = false) {
+            const log = document.getElementById('activity-log');
+            const entries = document.getElementById('log-entries');
+            log.classList.remove('hidden');
+
+            const icons = {
+                thinking: '⏳',
+                success: '✓',
+                info: 'ℹ',
+                error: '✗'
+            };
+
+            time = new Date().toLocaleTimeString('en-US', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            // Remove active class from previous entries
+            entries.querySelectorAll('.log-entry.active').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}${isActive ? ' active' : ''}`;
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-icon">${icons[type] || '•'}</span>
+                <span class="log-message">${message}</span>
+            `;
+            entries.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateLastLogEntry(type, message) {
+            const entries = document.getElementById('log-entries');
+            const lastEntry = entries.querySelector('.log-entry:last-child');
+            if (lastEntry) {
+                lastEntry.className = `log-entry ${type}`;
+                lastEntry.querySelector('.log-message').textContent = message;
+            }
+        }
+
+        // Component Detail Panel Functions - Full Screen Two-Column
+        let chatHistory = [];
+        let chatRequestInProgress = false;
+
+        function openComponentDetail(componentId) {
+            const comp = (currentBrief?.components || []).find(c => c.id === componentId);
+            if (!comp) return;
+
+            selectedComponentId = componentId;
+            originalComponentData = JSON.parse(JSON.stringify(comp));
+            chatHistory = [];
+
+            // Update selected state on tags
+            document.querySelectorAll('.component-tag').forEach(tag => {
+                tag.classList.remove('selected');
+                if (tag.dataset.id === componentId) {
+                    tag.classList.add('selected');
+                }
+            });
+
+            // Update header
+            document.getElementById('panel-title').textContent = comp.label;
+            document.getElementById('panel-type').textContent = comp.type || 'Component';
+            const statusBadge = document.getElementById('panel-status');
+            statusBadge.className = `detail-badge ${comp.status || 'pending'}`;
+            statusBadge.textContent = (comp.status || 'pending').toUpperCase();
+
+            // Populate Detail Hero (right panel top)
+            populateDetailHero(comp);
+
+            // Populate Detail Grid (right panel sections)
+            populateDetailGrid(comp);
+
+            // Clear and initialize chat
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+
+            // Add welcome message
+            addChatMessage('ai', `I'm here to help you understand and refine the <strong>${comp.label}</strong> component. You can ask me to explain details, add requirements, identify risks, or suggest test cases. What would you like to know?`);
+
+            // Show panel
+            document.getElementById('detail-panel').style.display = 'block';
+            document.getElementById('chat-input').focus();
+        }
+
+        function populateDetailHero(comp) {
+            const hero = document.getElementById('detail-hero');
+            hero.innerHTML = `
+                <div class="summary-text">${comp.summary || 'No summary available. Ask the AI to explain this component.'}</div>
+                ${comp.problem ? `
+                    <div class="problem-box">
+                        <h4>Problem Statement</h4>
+                        <p>${escapeHtml(comp.problem)}</p>
+                    </div>
+                ` : ''}
+                ${(comp.goals || []).length > 0 ? `
+                    <div class="goals-box">
+                        <h4>Goals</h4>
+                        <div class="goals-list">
+                            ${comp.goals.map(g => `<div class="goal-item">${escapeHtml(g)}</div>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        function populateDetailGrid(comp) {
+            const grid = document.getElementById('detail-grid');
+
+            // Build scope items
+            const scopeItems = (comp.scope || []).map(s => {
+                const isExcluded = s.toLowerCase().startsWith('not:');
+                const text = isExcluded ? s.substring(4).trim() : s;
+                return `<div class="scope-item ${isExcluded ? 'excluded' : 'included'}">${escapeHtml(text)}</div>`;
+            }).join('') || '<p style="color:#555; font-style:italic; font-size:12px;">No scope defined</p>';
+
+            // Build requirements
+            const requirementsList = (comp.requirements || []).length > 0
+                ? `<ul class="detail-list">${comp.requirements.map(r => `<li><span class="bullet">→</span>${escapeHtml(r)}</li>`).join('')}</ul>`
+                : '<p style="color:#555; font-style:italic; font-size:12px;">No requirements defined</p>';
+
+            // Build risks
+            const risksList = (comp.risks || []).length > 0
+                ? `<ul class="detail-list">${comp.risks.map(r => `<li><span class="bullet risk">!</span>${escapeHtml(r)}</li>`).join('')}</ul>`
+                : '<p style="color:#555; font-style:italic; font-size:12px;">No risks identified</p>';
+
+            // Build test cases
+            const testsList = (comp.testCases || []).length > 0
+                ? comp.testCases.map(tc => {
+                    const name = typeof tc === 'string' ? tc : tc.name;
+                    const type = tc.type || 'unit';
+                    const priority = tc.priority || 'medium';
+                    return `
+                        <div class="test-item">
+                            <span class="test-type ${type}">${type}</span>
+                            <span class="test-priority ${priority}">${priority}</span>
+                            <span class="test-name">${escapeHtml(name)}</span>
+                        </div>
+                    `;
+                }).join('')
+                : '<p style="color:#555; font-style:italic; font-size:12px;">No test cases defined</p>';
+
+            grid.innerHTML = `
+                <div class="detail-section">
+                    <h4>Requirements <span class="count">${(comp.requirements || []).length}</span></h4>
+                    ${requirementsList}
+                </div>
+                <div class="detail-section">
+                    <h4>Risks <span class="count">${(comp.risks || []).length}</span></h4>
+                    ${risksList}
+                </div>
+                <div class="detail-section">
+                    <h4>Scope</h4>
+                    ${scopeItems}
+                </div>
+                <div class="detail-section">
+                    <h4>Test Cases <span class="count">${(comp.testCases || []).length}</span></h4>
+                    ${testsList}
+                </div>
+                <div class="detail-section full-width">
+                    <h4>Data Flow</h4>
+                    <div class="io-row">
+                        <div class="io-box inputs">
+                            <h5>Inputs</h5>
+                            <ul>${(comp.inputs || []).length > 0 ? comp.inputs.map(i => `<li>← ${escapeHtml(i)}</li>`).join('') : '<li style="color:#555">None defined</li>'}</ul>
+                        </div>
+                        <div class="io-box outputs">
+                            <h5>Outputs</h5>
+                            <ul>${(comp.outputs || []).length > 0 ? comp.outputs.map(o => `<li>→ ${escapeHtml(o)}</li>`).join('') : '<li style="color:#555">None defined</li>'}</ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function refreshDetailPanel() {
+            const comp = currentBrief?.components?.find(c => c.id === selectedComponentId);
+            if (comp) {
+                populateDetailHero(comp);
+                populateDetailGrid(comp);
+            }
+        }
+
+        function addChatMessage(type, content, actions = null) {
+            const chatMessages = document.getElementById('chat-messages');
+            const msg = document.createElement('div');
+            msg.className = `chat-message ${type}`;
+
+            if (type === 'ai') {
+                msg.innerHTML = `
+                    <div class="message-header">AI Assistant</div>
+                    <div class="message-content">${content}</div>
+                    ${actions ? `<div class="action-taken">${actions}</div>` : ''}
+                `;
+            } else if (type === 'user') {
+                msg.innerHTML = escapeHtml(content);
+            } else if (type === 'system') {
+                msg.innerHTML = content;
+            }
+
+            chatMessages.appendChild(msg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            chatHistory.push({ type, content });
+        }
+
+        function showTypingIndicator() {
+            const chatMessages = document.getElementById('chat-messages');
+            const indicator = document.createElement('div');
+            indicator.className = 'chat-message ai';
+            indicator.id = 'typing-indicator';
+            indicator.innerHTML = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+            chatMessages.appendChild(indicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        async function sendChatMessage(presetMessage = null) {
+            const input = document.getElementById('chat-input');
+            const message = presetMessage || input.value.trim();
+
+            if (!message || chatRequestInProgress || !selectedComponentId) return;
+
+            // Clear input
+            if (!presetMessage) input.value = '';
+
+            // Add user message to chat
+            addChatMessage('user', message);
+
+            // Show typing indicator
+            chatRequestInProgress = true;
+            document.getElementById('chat-send-btn').disabled = true;
+            showTypingIndicator();
+
+            try {
+                const comp = currentBrief?.components?.find(c => c.id === selectedComponentId);
+                if (!comp) throw new Error('Component not found');
+
+                const response = await fetch('/api/component/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        component: comp,
+                        message: message,
+                        history: chatHistory.slice(-10), // Last 10 messages for context
+                        projectContext: currentBrief?.summary || '',
+                        model: getSelectedModel()
+                    })
+                });
+
+                const result = await response.json();
+                removeTypingIndicator();
+
+                if (result.status === 'success' && result.data) {
+                    const data = result.data;
+
+                    // Apply any changes the AI made
+                    let actionsText = null;
+                    if (data.changes && Object.keys(data.changes).length > 0) {
+                        actionsText = applyAIChanges(data.changes);
+                    }
+
+                    // Add AI response
+                    addChatMessage('ai', data.response || 'I processed your request.', actionsText);
+
+                    // Update the summary hero if summary changed
+                    if (data.changes?.summary) {
+                        document.querySelector('.summary-hero .summary-text').textContent = data.changes.summary;
+                    }
+                } else {
+                    addChatMessage('ai', result.data?.error || 'Sorry, I encountered an error processing your request.');
+                }
+            } catch (err) {
+                removeTypingIndicator();
+                addChatMessage('ai', `Connection error: ${err.message}`);
+            } finally {
+                chatRequestInProgress = false;
+                document.getElementById('chat-send-btn').disabled = false;
+            }
+        }
+
+        function applyAIChanges(changes) {
+            const comp = currentBrief?.components?.find(c => c.id === selectedComponentId);
+            if (!comp) return null;
+
+            const actionsList = [];
+
+            // Apply each change
+            for (const [field, value] of Object.entries(changes)) {
+                if (field === 'add_requirements' && Array.isArray(value)) {
+                    comp.requirements = [...(comp.requirements || []), ...value];
+                    actionsList.push(`Added ${value.length} requirement(s)`);
+                }
+                else if (field === 'add_risks' && Array.isArray(value)) {
+                    comp.risks = [...(comp.risks || []), ...value];
+                    actionsList.push(`Added ${value.length} risk(s)`);
+                }
+                else if (field === 'add_tests' && Array.isArray(value)) {
+                    comp.testCases = [...(comp.testCases || []), ...value];
+                    actionsList.push(`Added ${value.length} test case(s)`);
+                }
+                else if (field === 'add_goals' && Array.isArray(value)) {
+                    comp.goals = [...(comp.goals || []), ...value];
+                    actionsList.push(`Added ${value.length} goal(s)`);
+                }
+                else if (field === 'add_scope' && Array.isArray(value)) {
+                    comp.scope = [...(comp.scope || []), ...value];
+                    actionsList.push(`Added ${value.length} scope item(s)`);
+                }
+                else if (field === 'add_inputs' && Array.isArray(value)) {
+                    comp.inputs = [...(comp.inputs || []), ...value];
+                    actionsList.push(`Added ${value.length} input(s)`);
+                }
+                else if (field === 'add_outputs' && Array.isArray(value)) {
+                    comp.outputs = [...(comp.outputs || []), ...value];
+                    actionsList.push(`Added ${value.length} output(s)`);
+                }
+                else if (field === 'summary' && typeof value === 'string') {
+                    comp.summary = value;
+                    actionsList.push('Updated summary');
+                }
+                else if (field === 'problem' && typeof value === 'string') {
+                    comp.problem = value;
+                    actionsList.push('Updated problem statement');
+                }
+                else if (field === 'status' && typeof value === 'string') {
+                    comp.status = value;
+                    actionsList.push(`Changed status to ${value}`);
+                }
+            }
+
+            // Refresh the detail panel and components display
+            if (actionsList.length > 0) {
+                refreshDetailPanel();
+                updateComponentsDisplay();
+                // Update header status if changed
+                if (changes.status) {
+                    const statusBadge = document.getElementById('panel-status');
+                    statusBadge.className = `detail-badge ${changes.status}`;
+                    statusBadge.textContent = changes.status.toUpperCase();
+                }
+            }
+
+            return actionsList.length > 0 ? actionsList.join(' • ') : null;
+        }
+
+        function buildTestCasesList(testCases) {
+            if (!testCases || testCases.length === 0) {
+                return '<p style="color:#555; font-style:italic; font-size:11px;">No test cases defined</p>' +
+                    '<button class="add-item-btn" onclick="addTestCase()">+ Add Test Case</button>';
+            }
+
+            const itemsHtml = testCases.map((tc, idx) => {
+                const tcName = typeof tc === 'string' ? tc : (tc.name || 'Unnamed test');
+                const tcType = typeof tc === 'object' ? (tc.type || 'unit') : 'unit';
+                const tcPriority = typeof tc === 'object' ? (tc.priority || 'medium') : 'medium';
+
+                return `
+                <div class="test-case-item" data-index="${idx}">
+                    <div class="test-case-header">
+                        <select class="test-type-select" data-field="testCases" data-index="${idx}" data-prop="type" onchange="markFieldChanged(this)">
+                            <option value="unit" ${tcType === 'unit' ? 'selected' : ''}>Unit</option>
+                            <option value="integration" ${tcType === 'integration' ? 'selected' : ''}>Integration</option>
+                            <option value="e2e" ${tcType === 'e2e' ? 'selected' : ''}>E2E</option>
+                        </select>
+                        <select class="test-priority-select" data-field="testCases" data-index="${idx}" data-prop="priority" onchange="markFieldChanged(this)">
+                            <option value="high" ${tcPriority === 'high' ? 'selected' : ''}>High</option>
+                            <option value="medium" ${tcPriority === 'medium' ? 'selected' : ''}>Medium</option>
+                            <option value="low" ${tcPriority === 'low' ? 'selected' : ''}>Low</option>
+                        </select>
+                        <button class="remove-item-btn" onclick="removeTestCase(${idx})" style="opacity:1;">×</button>
+                    </div>
+                    <input type="text" class="test-case-name" value="${escapeHtml(tcName)}"
+                           data-field="testCases" data-index="${idx}" data-prop="name"
+                           oninput="markFieldChanged(this)" placeholder="Test case description...">
+                </div>`;
+            }).join('');
+
+            return itemsHtml + '<button class="add-item-btn" onclick="addTestCase()">+ Add Test Case</button>';
+        }
+
+        function addTestCase() {
+            const container = document.getElementById('edit-testCases');
+            const items = container.querySelectorAll('.test-case-item');
+            const newIndex = items.length;
+
+            const newItem = document.createElement('div');
+            newItem.className = 'test-case-item';
+            newItem.dataset.index = newIndex;
+            newItem.innerHTML = `
+                <div class="test-case-header">
+                    <select class="test-type-select" data-field="testCases" data-index="${newIndex}" data-prop="type" onchange="markFieldChanged(this)">
+                        <option value="unit" selected>Unit</option>
+                        <option value="integration">Integration</option>
+                        <option value="e2e">E2E</option>
+                    </select>
+                    <select class="test-priority-select" data-field="testCases" data-index="${newIndex}" data-prop="priority" onchange="markFieldChanged(this)">
+                        <option value="high">High</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <button class="remove-item-btn" onclick="removeTestCase(${newIndex})" style="opacity:1;">×</button>
+                </div>
+                <input type="text" class="test-case-name" value=""
+                       data-field="testCases" data-index="${newIndex}" data-prop="name"
+                       oninput="markFieldChanged(this)" placeholder="Test case description...">
+            `;
+
+            const addBtn = container.querySelector('.add-item-btn');
+            container.insertBefore(newItem, addBtn);
+            newItem.querySelector('.test-case-name').focus();
+            markFieldChanged(newItem);
+        }
+
+        function removeTestCase(index) {
+            const container = document.getElementById('edit-testCases');
+            const items = container.querySelectorAll('.test-case-item');
+            if (items[index]) {
+                items[index].remove();
+                // Reindex remaining items
+                container.querySelectorAll('.test-case-item').forEach((item, idx) => {
+                    item.dataset.index = idx;
+                    item.querySelectorAll('[data-index]').forEach(el => el.dataset.index = idx);
+                });
+                markFieldChanged(container);
+            }
+        }
+
+        function buildEditableList(items, fieldName, addLabel, isExplainable = false) {
+            const itemsHtml = items.map((item, idx) => `
+                <div class="editable-list-item">
+                    <span class="bullet" style="${fieldName === 'risks' ? 'color:#e74c3c' : 'color:var(--accent-color)'}">
+                        ${fieldName === 'risks' ? '!' : fieldName === 'goals' ? '◆' : '→'}
+                    </span>
+                    <input type="text" value="${escapeHtml(item)}"
+                           data-field="${fieldName}" data-index="${idx}"
+                           oninput="markFieldChanged(this)"
+                           ${isExplainable ? `onclick="showExplanation(event, '${escapeHtml(item)}', '${fieldName}')"` : ''}>
+                    <button class="remove-item-btn" onclick="removeListItem('${fieldName}', ${idx})">×</button>
+                </div>
+            `).join('');
+
+            return itemsHtml + `<button class="add-item-btn" onclick="addListItem('${fieldName}')">${addLabel}</button>`;
+        }
+
+        function markFieldChanged(element) {
+            hasUnsavedChanges = true;
+            updateUnsavedIndicator();
+        }
+
+        function updateUnsavedIndicator() {
+            const indicator = document.getElementById('unsaved-indicator');
+            const actions = document.getElementById('panel-actions');
+            if (hasUnsavedChanges) {
+                indicator.classList.add('show');
+                actions.style.display = 'flex';
+            } else {
+                indicator.classList.remove('show');
+                actions.style.display = 'none';
+            }
+        }
+
+        function addListItem(fieldName) {
+            const container = document.getElementById(`edit-${fieldName}`);
+            const items = container.querySelectorAll('.editable-list-item');
+            const newIndex = items.length;
+
+            const newItem = document.createElement('div');
+            newItem.className = 'editable-list-item';
+            newItem.innerHTML = `
+                <span class="bullet" style="${fieldName === 'risks' ? 'color:#e74c3c' : 'color:var(--accent-color)'}">
+                    ${fieldName === 'risks' ? '!' : fieldName === 'goals' ? '◆' : '→'}
+                </span>
+                <input type="text" value="" data-field="${fieldName}" data-index="${newIndex}"
+                       oninput="markFieldChanged(this)" placeholder="Enter new item...">
+                <button class="remove-item-btn" onclick="removeListItem('${fieldName}', ${newIndex})">×</button>
+            `;
+
+            // Insert before the add button
+            const addBtn = container.querySelector('.add-item-btn');
+            container.insertBefore(newItem, addBtn);
+
+            // Focus the new input
+            newItem.querySelector('input').focus();
+            markFieldChanged(newItem);
+        }
+
+        function removeListItem(fieldName, index) {
+            const container = document.getElementById(`edit-${fieldName}`);
+            const items = container.querySelectorAll('.editable-list-item');
+            if (items[index]) {
+                items[index].remove();
+                // Reindex remaining items
+                container.querySelectorAll('.editable-list-item input').forEach((input, idx) => {
+                    input.dataset.index = idx;
+                });
+                markFieldChanged(container);
+            }
+        }
+
+        // Explanation tooltip functions
+        function showExplanation(event, text, category) {
+            event.stopPropagation();
+
+            const tooltip = document.getElementById('explain-tooltip');
+            const content = document.getElementById('tooltip-content');
+            const title = document.getElementById('tooltip-title');
+
+            // Position near the clicked element
+            const rect = event.target.getBoundingClientRect();
+            tooltip.style.left = `${Math.min(rect.left, window.innerWidth - 380)}px`;
+            tooltip.style.top = `${rect.bottom + 10}px`;
+
+            title.textContent = category === 'risks' ? 'Risk Analysis' : 'Explanation';
+            tooltip.style.borderColor = category === 'risks' ? 'var(--accent-error)' : 'var(--accent-color)';
+
+            // Check cache first
+            const cacheKey = `${category}:${text}`;
+            if (explanationCache[cacheKey]) {
+                content.innerHTML = explanationCache[cacheKey];
+                tooltip.style.display = 'block';
+                return;
+            }
+
+            // Show loading state
+            content.innerHTML = '<div class="tooltip-loading">Analyzing...</div>';
+            tooltip.style.display = 'block';
+
+            // Get explanation from AI (simulated for now - can be connected to actual API)
+            generateExplanation(text, category).then(explanation => {
+                explanationCache[cacheKey] = explanation;
+                content.innerHTML = explanation;
+            }).catch(err => {
+                content.innerHTML = `<p style="color:#888">${getDefaultExplanation(text, category)}</p>`;
+            });
+        }
+
+        async function generateExplanation(text, category) {
+            // For now, provide contextual explanations without API call
+            // This could be enhanced to call Claude for deeper analysis
+            return getDefaultExplanation(text, category);
+        }
+
+        function getDefaultExplanation(text, category) {
+            const textLower = text.toLowerCase();
+
+            if (category === 'risks') {
+                // Provide contextual risk analysis
+                if (textLower.includes('security') || textLower.includes('auth')) {
+                    return `<p><strong>Security Risk</strong></p>
+                            <p>This risk involves potential vulnerabilities in authentication, authorization, or data protection.</p>
+                            <p><strong>Mitigation strategies:</strong></p>
+                            <ul style="margin:8px 0 0 16px; color:#aaa;">
+                                <li>Implement proper input validation</li>
+                                <li>Use encrypted connections (HTTPS/TLS)</li>
+                                <li>Follow OWASP security guidelines</li>
+                                <li>Conduct security audits</li>
+                            </ul>`;
+                }
+                if (textLower.includes('performance') || textLower.includes('scale') || textLower.includes('load')) {
+                    return `<p><strong>Performance Risk</strong></p>
+                            <p>This risk relates to system speed, scalability, or resource management under load.</p>
+                            <p><strong>Mitigation strategies:</strong></p>
+                            <ul style="margin:8px 0 0 16px; color:#aaa;">
+                                <li>Implement caching strategies</li>
+                                <li>Use load balancing</li>
+                                <li>Optimize database queries</li>
+                                <li>Set up performance monitoring</li>
+                            </ul>`;
+                }
+                if (textLower.includes('complex') || textLower.includes('difficult')) {
+                    return `<p><strong>Complexity Risk</strong></p>
+                            <p>High complexity increases development time and potential for bugs.</p>
+                            <p><strong>Mitigation strategies:</strong></p>
+                            <ul style="margin:8px 0 0 16px; color:#aaa;">
+                                <li>Break into smaller sub-components</li>
+                                <li>Create clear documentation</li>
+                                <li>Use proven patterns and libraries</li>
+                                <li>Plan for iterative development</li>
+                            </ul>`;
+                }
+                if (textLower.includes('depend') || textLower.includes('third-party') || textLower.includes('external')) {
+                    return `<p><strong>Dependency Risk</strong></p>
+                            <p>Reliance on external services or libraries introduces potential points of failure.</p>
+                            <p><strong>Mitigation strategies:</strong></p>
+                            <ul style="margin:8px 0 0 16px; color:#aaa;">
+                                <li>Implement fallback mechanisms</li>
+                                <li>Use stable, well-maintained dependencies</li>
+                                <li>Monitor dependency health</li>
+                                <li>Have contingency plans</li>
+                            </ul>`;
+                }
+                // Generic risk
+                return `<p><strong>Risk Assessment</strong></p>
+                        <p>"${text}"</p>
+                        <p style="margin-top:10px; color:#aaa;">Consider the likelihood and impact of this risk to prioritize mitigation efforts. Document any assumptions and track risk status throughout development.</p>`;
+            }
+
+            // Default for other categories
+            return `<p>${text}</p><p style="color:#888; margin-top:8px;">Click items to see detailed explanations and recommendations.</p>`;
+        }
+
+        function closeExplainTooltip() {
+            document.getElementById('explain-tooltip').style.display = 'none';
+        }
+
+        // AI Assistant Functions
+        let aiRequestInProgress = false;
+
+        async function aiAssist(action, userInput = '') {
+            if (aiRequestInProgress || !selectedComponentId) return;
+
+            const comp = currentBrief?.components?.find(c => c.id === selectedComponentId);
+            if (!comp) return;
+
+            aiRequestInProgress = true;
+            const responseArea = document.getElementById('ai-response');
+            const responseContent = document.getElementById('ai-response-content');
+
+            // Show loading state
+            responseArea.classList.add('show');
+            responseContent.innerHTML = '<div class="ai-response-loading">Thinking...</div>';
+
+            // Disable buttons during request
+            document.querySelectorAll('.ai-action-btn, .ai-send-btn').forEach(btn => {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            });
+
+            try {
+                const response = await fetch('/api/component/assist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        component: comp,
+                        action: action,
+                        input: userInput,
+                        context: currentBrief?.summary || '',
+                        model: getSelectedModel()
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    renderAiResponse(result.data, action);
+                    // Clear input if it was a question
+                    if (action === 'question') {
+                        document.getElementById('ai-question-input').value = '';
+                    }
+                } else {
+                    responseContent.innerHTML = `<p style="color:var(--accent-error)">Error: ${result.data?.error || result.message || 'Unknown error'}</p>`;
+                }
+            } catch (err) {
+                responseContent.innerHTML = `<p style="color:var(--accent-error)">Connection error: ${err.message}</p>`;
+            } finally {
+                aiRequestInProgress = false;
+                document.querySelectorAll('.ai-action-btn, .ai-send-btn').forEach(btn => {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                });
+            }
+        }
+
+        function renderAiResponse(data, action) {
+            const content = document.getElementById('ai-response-content');
+            let html = '';
+
+            if (data.error) {
+                html = `<p style="color:var(--accent-error)">${data.error}</p>`;
+            } else if (action === 'question' && data.answer) {
+                // Question response
+                html = `<div class="ai-answer">${escapeHtml(data.answer)}</div>`;
+                if (data.code_example) {
+                    html += `<div class="ai-code-block">${escapeHtml(data.code_example)}</div>`;
+                }
+                if (data.suggestions?.length) {
+                    html += renderSuggestionGroup('Follow-up Suggestions', data.suggestions, 'suggestion');
+                }
+            } else {
+                // Suggestion response
+                if (data.suggestions?.length) {
+                    html += renderSuggestionGroup('Suggestions', data.suggestions, 'suggestion');
+                }
+                if (data.missing_requirements?.length) {
+                    html += renderSuggestionGroup('Missing Requirements', data.missing_requirements, 'requirements');
+                }
+                if (data.related_requirements?.length) {
+                    html += renderSuggestionGroup('Related Requirements', data.related_requirements, 'requirements');
+                }
+                if (data.missing_tests?.length || data.related_tests?.length) {
+                    const tests = [...(data.missing_tests || []), ...(data.related_tests || [])];
+                    html += renderTestSuggestions('Suggested Test Cases', tests);
+                }
+                if (data.potential_risks?.length || data.related_risks?.length) {
+                    const risks = [...(data.potential_risks || []), ...(data.related_risks || [])];
+                    html += renderSuggestionGroup('Potential Risks', risks, 'risks');
+                }
+                if (data.questions?.length) {
+                    html += renderSuggestionGroup('Questions to Consider', data.questions, 'question');
+                }
+                if (data.explanation) {
+                    html += `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-light); color:#888; font-style:italic;">${escapeHtml(data.explanation)}</div>`;
+                }
+            }
+
+            if (!html) {
+                html = '<p style="color:#888">No suggestions at this time.</p>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        function renderSuggestionGroup(label, items, type) {
+            if (!items?.length) return '';
+
+            const itemsHtml = items.map((item, idx) => {
+                const text = typeof item === 'string' ? item : item.name || item;
+                return `
+                    <div class="ai-suggestion-item" onclick="addSuggestionToComponent('${type}', '${escapeHtml(text).replace(/'/g, "\\'")}', this)">
+                        <span class="add-icon">+</span>
+                        <span class="text">${escapeHtml(text)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="ai-suggestion-group">
+                    <div class="ai-suggestion-label">${label}</div>
+                    ${itemsHtml}
+                </div>
+            `;
+        }
+
+        function renderTestSuggestions(label, tests) {
+            if (!tests?.length) return '';
+
+            const itemsHtml = tests.map((tc, idx) => {
+                const name = typeof tc === 'string' ? tc : tc.name;
+                const type = tc.type || 'unit';
+                const priority = tc.priority || 'medium';
+                const encoded = encodeURIComponent(JSON.stringify({ name, type, priority }));
+
+                return `
+                    <div class="ai-suggestion-item" onclick="addTestSuggestion('${encoded}', this)">
+                        <span class="add-icon">+</span>
+                        <span class="text">
+                            <span style="color:var(--accent-color); font-size:9px; text-transform:uppercase;">[${type}]</span>
+                            ${escapeHtml(name)}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="ai-suggestion-group">
+                    <div class="ai-suggestion-label">${label}</div>
+                    ${itemsHtml}
+                </div>
+            `;
+        }
+
+        function addSuggestionToComponent(type, text, element) {
+            if (!selectedComponentId || !currentBrief) return;
+
+            const comp = currentBrief.components.find(c => c.id === selectedComponentId);
+            if (!comp) return;
+
+            // Map suggestion types to component fields
+            const fieldMap = {
+                'requirements': 'requirements',
+                'risks': 'risks',
+                'goals': 'goals',
+                'suggestion': 'requirements', // General suggestions go to requirements
+                'question': null // Questions are just informational
+            };
+
+            const field = fieldMap[type];
+            if (!field) {
+                // Just mark as acknowledged
+                element.classList.add('added');
+                element.querySelector('.add-icon').textContent = '✓';
+                return;
+            }
+
+            // Add to component data
+            if (!comp[field]) comp[field] = [];
+            if (!comp[field].includes(text)) {
+                comp[field].push(text);
+
+                // Update the UI field
+                const container = document.getElementById(`edit-${field}`);
+                if (container) {
+                    const items = container.querySelectorAll('.editable-list-item');
+                    const newIndex = items.length;
+
+                    const newItem = document.createElement('div');
+                    newItem.className = 'editable-list-item';
+                    newItem.innerHTML = `
+                        <span class="bullet" style="${field === 'risks' ? 'color:#e74c3c' : 'color:var(--accent-color)'}">
+                            ${field === 'risks' ? '!' : field === 'goals' ? '◆' : '→'}
+                        </span>
+                        <input type="text" value="${escapeHtml(text)}" data-field="${field}" data-index="${newIndex}"
+                               oninput="markFieldChanged(this)">
+                        <button class="remove-item-btn" onclick="removeListItem('${field}', ${newIndex})">×</button>
+                    `;
+                    const addBtn = container.querySelector('.add-item-btn');
+                    container.insertBefore(newItem, addBtn);
+                }
+
+                markFieldChanged(element);
+            }
+
+            // Visual feedback
+            element.classList.add('added');
+            element.querySelector('.add-icon').textContent = '✓';
+        }
+
+        function addTestSuggestion(encoded, element) {
+            if (!selectedComponentId || !currentBrief) return;
+
+            const comp = currentBrief.components.find(c => c.id === selectedComponentId);
+            if (!comp) return;
+
+            const tc = JSON.parse(decodeURIComponent(encoded));
+
+            // Add to component data
+            if (!comp.testCases) comp.testCases = [];
+            comp.testCases.push(tc);
+
+            // Update the UI
+            const container = document.getElementById('edit-testCases');
+            if (container) {
+                // Remove "no test cases" message if present
+                const noTests = container.querySelector('p');
+                if (noTests) noTests.remove();
+
+                const items = container.querySelectorAll('.test-case-item');
+                const newIndex = items.length;
+
+                const newItem = document.createElement('div');
+                newItem.className = 'test-case-item';
+                newItem.dataset.index = newIndex;
+                newItem.innerHTML = `
+                    <div class="test-case-header">
+                        <select class="test-type-select" data-field="testCases" data-index="${newIndex}" data-prop="type" onchange="markFieldChanged(this)">
+                            <option value="unit" ${tc.type === 'unit' ? 'selected' : ''}>Unit</option>
+                            <option value="integration" ${tc.type === 'integration' ? 'selected' : ''}>Integration</option>
+                            <option value="e2e" ${tc.type === 'e2e' ? 'selected' : ''}>E2E</option>
+                        </select>
+                        <select class="test-priority-select" data-field="testCases" data-index="${newIndex}" data-prop="priority" onchange="markFieldChanged(this)">
+                            <option value="high" ${tc.priority === 'high' ? 'selected' : ''}>High</option>
+                            <option value="medium" ${tc.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                            <option value="low" ${tc.priority === 'low' ? 'selected' : ''}>Low</option>
+                        </select>
+                        <button class="remove-item-btn" onclick="removeTestCase(${newIndex})" style="opacity:1;">×</button>
+                    </div>
+                    <input type="text" class="test-case-name" value="${escapeHtml(tc.name)}"
+                           data-field="testCases" data-index="${newIndex}" data-prop="name"
+                           oninput="markFieldChanged(this)">
+                `;
+
+                const addBtn = container.querySelector('.add-item-btn');
+                container.insertBefore(newItem, addBtn);
+            }
+
+            markFieldChanged(element);
+
+            // Visual feedback
+            element.classList.add('added');
+            element.querySelector('.add-icon').textContent = '✓';
+        }
+
+        function closeDetailPanel() {
+            document.getElementById('detail-panel').style.display = 'none';
+            selectedComponentId = null;
+            chatHistory = [];
+            originalComponentData = null;
+            document.querySelectorAll('.component-tag').forEach(tag => {
+                tag.classList.remove('selected');
+            });
+        }
+
+        function gatherComponentEdits() {
+            const body = document.getElementById('panel-body');
+            const updates = {};
+
+            // Get simple fields
+            const statusSelect = body.querySelector('[data-field="status"]');
+            if (statusSelect) updates.status = statusSelect.value;
+
+            const summaryField = body.querySelector('[data-field="summary"]');
+            if (summaryField) updates.summary = summaryField.value;
+
+            const problemField = body.querySelector('[data-field="problem"]');
+            if (problemField) updates.problem = problemField.value;
+
+            // Get list fields
+            ['goals', 'requirements', 'risks', 'inputs', 'outputs'].forEach(fieldName => {
+                const container = document.getElementById(`edit-${fieldName}`);
+                if (container) {
+                    const items = [];
+                    container.querySelectorAll('.editable-list-item input').forEach(input => {
+                        const value = input.value.trim();
+                        if (value) items.push(value);
+                    });
+                    updates[fieldName] = items;
+                }
+            });
+
+            // Get test cases
+            const testCasesContainer = document.getElementById('edit-testCases');
+            if (testCasesContainer) {
+                const testCases = [];
+                testCasesContainer.querySelectorAll('.test-case-item').forEach(item => {
+                    const name = item.querySelector('.test-case-name')?.value?.trim();
+                    const type = item.querySelector('.test-type-select')?.value || 'unit';
+                    const priority = item.querySelector('.test-priority-select')?.value || 'medium';
+                    if (name) {
+                        testCases.push({ name, type, priority });
+                    }
+                });
+                updates.testCases = testCases;
+            }
+
+            return updates;
+        }
+
+        async function saveComponentChanges() {
+            if (!selectedComponentId || !currentBrief) return;
+
+            const updates = gatherComponentEdits();
+
+            // Update local state first
+            const comp = currentBrief.components.find(c => c.id === selectedComponentId);
+            if (comp) {
+                Object.assign(comp, updates);
+            }
+
+            // Try to save to database if we have a project
+            if (currentProjectId) {
+                try {
+                    const response = await fetch(`/api/components/${selectedComponentId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updates)
+                    });
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        addLogEntry('success', `Saved changes to: ${comp.label}`);
+                    } else {
+                        addLogEntry('error', `Save failed: ${result.message}`);
+                        // Still keep local changes even if DB save fails
+                    }
+                } catch (err) {
+                    addLogEntry('error', `Save error: ${err.message}`);
+                }
+            } else {
+                addLogEntry('info', `Updated locally: ${comp.label}`);
+            }
+
+            hasUnsavedChanges = false;
+            updateUnsavedIndicator();
+
+            // Update components preview displays
+            updateComponentsDisplay();
+        }
+
+        function discardComponentChanges() {
+            if (!selectedComponentId || !originalComponentData) return;
+
+            // Restore original data
+            const compIndex = currentBrief.components.findIndex(c => c.id === selectedComponentId);
+            if (compIndex !== -1) {
+                currentBrief.components[compIndex] = JSON.parse(JSON.stringify(originalComponentData));
+            }
+
+            hasUnsavedChanges = false;
+            updateUnsavedIndicator();
+
+            // Re-open the panel with original data
+            openComponentDetail(selectedComponentId);
+            addLogEntry('info', 'Discarded changes');
+        }
+
+        function updateComponentsDisplay() {
+            // Update the components preview in various sections
+            const previewContainers = [
+                document.getElementById('componentsPreview'),
+                document.getElementById('finalComponents')
+            ];
+
+            previewContainers.forEach(container => {
+                if (container && currentBrief?.components) {
+                    container.innerHTML = '';
+                    currentBrief.components.forEach(comp => {
+                        container.appendChild(createComponentTag(comp));
+                    });
+                }
+            });
+
+            // Update node count
+            const nodeCount = document.getElementById('nodeCount');
+            if (nodeCount && currentBrief?.components) {
+                nodeCount.textContent = currentBrief.components.length;
+            }
+        }
+
+        // Helper to create clickable component tags
+        function createComponentTag(comp) {
+            const tag = document.createElement('span');
+            tag.className = 'component-tag' + (comp.type === 'root' ? ' root' : '');
+            tag.textContent = comp.label;
+            tag.dataset.id = comp.id;
+            tag.onclick = () => openComponentDetail(comp.id);
+            if (selectedComponentId === comp.id) {
+                tag.classList.add('selected');
+            }
+            return tag;
+        }
+
+        // Add click handlers to Mermaid diagram nodes
+        window.addDiagramClickHandlers = function () {
+            const svg = document.querySelector('#mermaid-container svg');
+            if (!svg || !currentBrief?.components) return;
+
+            // Find all clickable node elements in mermaid
+            const nodeGroups = svg.querySelectorAll('g.node, g[class*="node"]');
+
+            nodeGroups.forEach(node => {
+                // Get the text label from the node
+                const labelEl = node.querySelector('.nodeLabel, text, foreignObject span');
+                const labelText = labelEl?.textContent?.trim() || '';
+
+                // Get node ID from the group id attribute
+                const groupId = node.id || '';
+
+                // Style as clickable
+                node.style.cursor = 'pointer';
+
+                // Find matching component
+                const findComponent = () => {
+                    return (currentBrief?.components || []).find(c => {
+                        // Match by label (most reliable)
+                        if (c.label && labelText) {
+                            if (c.label.toLowerCase() === labelText.toLowerCase()) return true;
+                            if (labelText.toLowerCase().includes(c.label.toLowerCase())) return true;
+                        }
+                        // Match by ID in group id
+                        if (groupId && c.id) {
+                            if (groupId.includes(c.id) || c.id.includes(groupId.split('-')[1])) return true;
+                        }
+                        return false;
+                    });
+                };
+
+                node.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const comp = findComponent();
+                    if (comp) {
+                        openComponentDetail(comp.id);
+                        highlightDiagramNode(node, svg);
+                    }
+                });
+
+                // Hover effects
+                const rect = node.querySelector('rect, polygon, circle, path');
+                const originalFill = rect?.style.fill || '';
+
+                node.addEventListener('mouseenter', () => {
+                    node.style.filter = 'brightness(1.2) drop-shadow(0 0 4px rgba(0,255,204,0.4))';
+                });
+                node.addEventListener('mouseleave', () => {
+                    if (!node.classList.contains('diagram-selected')) {
+                        node.style.filter = '';
+                    }
+                });
+            });
+
+            console.log(`[Diagram] Added click handlers to ${nodeGroups.length} nodes`);
+        };
+
+        function highlightDiagramNode(selectedNode, svg) {
+            // Remove previous selection
+            svg.querySelectorAll('.diagram-selected').forEach(n => {
+                n.classList.remove('diagram-selected');
+                n.style.filter = '';
+            });
+            // Highlight selected
+            selectedNode.classList.add('diagram-selected');
+            selectedNode.style.filter = 'brightness(1.2) drop-shadow(0 0 8px rgba(0,255,204,0.6))';
+        }
+
+        async function checkServerStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                // Only set model from server if user hasn't saved a preference
+                const savedModel = localStorage.getItem('selectedModel');
+                if (!savedModel && data.model) {
+                    const select = document.getElementById('modelSelect');
+                    for (let option of select.options) {
+                        if (data.model.includes(option.value) || option.value.includes(data.model)) {
+                            select.value = option.value;
+                            selectedModel = option.value;
+                            break;
+                        }
+                    }
+                }
+
+                const isReady = data.cli_available && data.using_new_agents;
+                document.getElementById('serverStatus').textContent = isReady ? 'Ready' : 'CLI Not Found';
+                document.getElementById('serverStatus').style.color = isReady ? 'var(--accent-success)' : 'var(--accent-error)';
+
+                if (!data.cli_available) {
+                    showStatus('status-initial', 'error',
+                        'Claude Code CLI not found. Install from: github.com/anthropics/claude-code');
+                }
+            } catch (err) {
+                document.getElementById('serverStatus').textContent = 'Offline';
+                document.getElementById('serverStatus').style.color = 'var(--accent-error)';
+                showStatus('status-initial', 'error',
+                    'Cannot connect to server. Run: python server.py');
+            }
+        }
+
+        // Loading overlay functions
+        let loadingTimerInterval = null;
+        let loadingStartTime = null;
+        let currentFetchController = null;  // For aborting fetch requests
+
+        function showLoadingOverlay(title = 'Analyzing Project') {
+            const overlay = document.getElementById('loading-overlay');
+            const titleEl = overlay.querySelector('.loading-title');
+            const timerEl = document.getElementById('loading-timer');
+            const statusEl = document.getElementById('loading-status');
+
+            titleEl.textContent = title;
+            timerEl.textContent = '0:00';
+            statusEl.textContent = 'Connecting to Claude...';
+
+            overlay.classList.add('active');
+            loadingStartTime = Date.now();
+
+            // Start timer
+            loadingTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - loadingStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+                // Update status based on time
+                if (elapsed < 5) {
+                    statusEl.textContent = 'Connecting to Claude...';
+                } else if (elapsed < 15) {
+                    statusEl.textContent = 'Reading project description...';
+                } else if (elapsed < 30) {
+                    statusEl.textContent = 'Analyzing requirements and scope...';
+                } else if (elapsed < 45) {
+                    statusEl.textContent = 'Identifying components...';
+                } else if (elapsed < 60) {
+                    statusEl.textContent = 'Mapping dependencies...';
+                } else if (elapsed < 75) {
+                    statusEl.textContent = 'Generating test cases...';
+                } else {
+                    statusEl.textContent = 'Finalizing analysis...';
+                }
+            }, 1000);
+        }
+
+        function hideLoadingOverlay() {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('active');
+            if (loadingTimerInterval) {
+                clearInterval(loadingTimerInterval);
+                loadingTimerInterval = null;
+            }
+        }
+
+        function cancelAnalysis() {
+            // Actually abort the fetch request
+            if (currentFetchController) {
+                currentFetchController.abort();
+                currentFetchController = null;
+            }
+            hideLoadingOverlay();
+            const btn = document.getElementById('btnAnalyze');
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('btn-loading');
+                btn.textContent = 'Analyze Project';
+            }
+            addLogEntry('info', 'Analysis cancelled by user');
+        }
+
+        async function submitInterview() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) {
+                showStatus('status-initial', 'error', 'Please enter a project description.');
+                return;
+            }
+
+            const btn = document.getElementById('btnAnalyze');
+            btn.disabled = true;
+            btn.classList.add('btn-loading');
+
+            // Show loading overlay
+            showLoadingOverlay('Analyzing Project');
+
+            // Clear and show activity log
+            clearActivityLog();
+            const modelName = getSelectedModel().split('-')[1] || 'claude';
+            addLogEntry('info', `Using model: ${modelName}`);
+            addLogEntry('thinking', 'Starting analysis...', true);
+
+            try {
+                // Create abort controller for this request
+                currentFetchController = new AbortController();
+
+                const response = await fetch('/api/start_interview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, model: getSelectedModel() }),
+                    signal: currentFetchController.signal
+                });
+
+                currentFetchController = null;
+                hideLoadingOverlay();
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    console.log('[Interview] Success! Full result:', result);
+                    console.log('[Interview] result.data:', result.data);
+                    console.log('[Interview] result.data.brief:', result.data.brief);
+                    console.log('[Interview] result.data.nodes:', result.data.nodes);
+
+                    currentGraphData = result.data;
+                    currentBrief = result.data.brief;
+
+                    // If brief doesn't have components but graphData has nodes, use those
+                    if (!currentBrief?.components?.length && result.data.nodes?.length) {
+                        console.log('[Interview] Brief missing components, using nodes from graphData');
+                        currentBrief = currentBrief || {};
+                        currentBrief.components = result.data.nodes;
+                        currentBrief.edges = result.data.edges || [];
+                    }
+
+                    console.log('[Interview] Final currentBrief:', currentBrief);
+                    currentProjectId = result.data.project_id || currentBrief?.project_id;
+
+                    const compCount = (currentBrief?.components || []).length;
+                    const questCount = (currentBrief?.questions || []).length;
+
+                    console.log(`[Interview] Found ${compCount} components, ${questCount} questions`);
+
+                    // Update node count in right pane
+                    const nodeCountEl = document.getElementById('nodeCount');
+                    if (nodeCountEl) nodeCountEl.textContent = compCount;
+
+                    addLogEntry('success', `Analysis complete!`);
+                    addLogEntry('info', `Found ${compCount} components`);
+                    if (questCount > 0) {
+                        addLogEntry('info', `Generated ${questCount} clarifying questions`);
+                    }
+
+                    // Reset button
+                    btn.disabled = false;
+                    btn.classList.remove('btn-loading');
+                    btn.textContent = 'Analyze Project';
+
+                    // Refresh projects list in background
+                    loadProjects();
+
+                    // Check if we have questions or ready for design
+                    try {
+                        if (result.data.readyForDesign) {
+                            console.log('[Interview] Ready for design, showing ready phase');
+                            showReadyPhase();
+                        } else {
+                            console.log('[Interview] Showing clarify phase');
+                            showClarifyPhase();
+                        }
+                    } catch (phaseErr) {
+                        console.error('[Interview] Error showing phase:', phaseErr);
+                        addLogEntry('error', 'UI error: ' + phaseErr.message);
+                    }
+                } else {
+                    addLogEntry('error', 'Analysis failed: ' + result.message);
+                    showStatus('status-initial', 'error', 'Error: ' + result.message);
+                    btn.disabled = false;
+                    btn.classList.remove('btn-loading');
+                    btn.textContent = 'Analyze Project';
+                }
+            } catch (err) {
+                currentFetchController = null;
+                hideLoadingOverlay();
+
+                // Don't show error for user-initiated cancellation
+                if (err.name === 'AbortError') {
+                    // Already handled in cancelAnalysis()
+                    return;
+                }
+
+                addLogEntry('error', 'Connection error: ' + err.message);
+                showStatus('status-initial', 'error', 'Connection error: ' + err.message);
+                btn.disabled = false;
+                btn.classList.remove('btn-loading');
+                btn.textContent = 'Analyze Project';
+            }
+        }
+
+        function showClarifyPhase() {
+            console.log('[showClarifyPhase] Starting...');
+            try {
+                // Update phase indicators
+                const phaseDescribe = document.getElementById('phase-describe');
+                const phaseClarify = document.getElementById('phase-clarify');
+                if (phaseDescribe) {
+                    phaseDescribe.classList.remove('active');
+                    phaseDescribe.classList.add('complete');
+                }
+                if (phaseClarify) {
+                    phaseClarify.classList.add('active');
+                }
+
+                // Hide describe, show clarify
+                const sectionDescribe = document.getElementById('section-describe');
+                const sectionClarify = document.getElementById('section-clarify');
+                if (sectionDescribe) sectionDescribe.classList.add('hidden');
+                if (sectionClarify) sectionClarify.classList.remove('hidden');
+
+                // Populate data
+                updateClarifySection();
+                console.log('[showClarifyPhase] Complete');
+            } catch (err) {
+                console.error('[showClarifyPhase] Error:', err);
+            }
+        }
+
+        function updateClarifySection() {
+            console.log('[updateClarifySection] Starting with brief:', currentBrief);
+            try {
+                if (!currentBrief) {
+                    console.error('[updateClarifySection] No currentBrief!');
+                    return;
+                }
+
+                const iteration = currentBrief.refinement_iteration || 0;
+                const iterationBadge = document.getElementById('iterationBadge');
+                if (iterationBadge) iterationBadge.textContent = `Round ${iteration + 1}`;
+
+                // Summary
+                const summaryEl = document.getElementById('currentSummary');
+                if (summaryEl) summaryEl.textContent = currentBrief.summary || 'No summary available';
+
+                // Components (clickable)
+                const componentsDiv = document.getElementById('componentsPreview');
+                if (componentsDiv) {
+                    componentsDiv.innerHTML = '';
+                    (currentBrief.components || []).forEach(comp => {
+                        componentsDiv.appendChild(createComponentTag(comp));
+                    });
+                }
+
+                // Risks
+                const risksList = document.getElementById('risksList');
+                const risksSection = document.getElementById('risksSection');
+                const risks = currentBrief.global_risks || [];
+                if (risksList && risksSection) {
+                    if (risks.length > 0) {
+                        risksList.innerHTML = risks.map(r => `<li>${r}</li>`).join('');
+                        risksSection.classList.remove('hidden');
+                    } else {
+                        risksSection.classList.add('hidden');
+                    }
+                }
+
+                // Questions
+                const questionsList = document.getElementById('questionsList');
+                const questions = currentBrief.questions || [];
+
+                console.log(`[updateClarifySection] ${questions.length} questions`);
+
+                if (questions.length === 0) {
+                    // No questions - ready for design
+                    console.log('[updateClarifySection] No questions, showing ready phase');
+                    showReadyPhase();
+                    return;
+                }
+
+                // Update Mermaid - use server diagram or generate from brief
+                console.log('[updateClarifySection] Updating diagram...');
+                console.log('[updateClarifySection] currentGraphData.mermaidDiagram:', currentGraphData?.mermaidDiagram);
+                console.log('[updateClarifySection] currentBrief:', currentBrief);
+
+                const mermaidCode = (currentGraphData && currentGraphData.mermaidDiagram)
+                    ? currentGraphData.mermaidDiagram
+                    : generateMermaidFromBrief(currentBrief);
+                console.log('[updateClarifySection] Final mermaidCode:', mermaidCode);
+
+                if (mermaidCode) {
+                    // Try to draw, with retry if module not loaded yet
+                    const tryDraw = (attempts = 0) => {
+                        if (window.drawMermaid) {
+                            window.drawMermaid(mermaidCode);
+                        } else if (attempts < 10) {
+                            console.log('[updateClarifySection] drawMermaid not ready, retrying...', attempts);
+                            setTimeout(() => tryDraw(attempts + 1), 200);
+                        } else {
+                            console.error('[updateClarifySection] drawMermaid never became available');
+                            // Fallback: just show the code
+                            const container = document.getElementById('mermaid-container');
+                            if (container) {
+                                container.innerHTML = '<pre style="color:#888;font-size:10px;">' + mermaidCode + '</pre>';
+                            }
+                        }
+                    };
+                    tryDraw();
+                } else {
+                    console.log('[updateClarifySection] No mermaid code to render!');
+                }
+
+                // Populate questions list
+                if (questionsList && questions.length > 0) {
+                    questionsList.innerHTML = questions.map((q, i) => `
+                        <li class="question-item">
+                            <label for="answer_${i}">${q}</label>
+                            <input type="text" id="answer_${i}" data-question="${encodeURIComponent(q)}"
+                                   placeholder="Your answer...">
+                        </li>
+                    `).join('');
+                }
+
+                console.log('[updateClarifySection] Complete');
+            } catch (err) {
+                console.error('[updateClarifySection] Error:', err);
+            }
+        }
+
+        async function submitAnswers() {
+            const btn = document.getElementById('btnRefine');
+            btn.disabled = true;
+            btn.textContent = 'Refining...';
+
+            // Show activity in log
+            addLogEntry('info', `Processing ${Object.keys(document.querySelectorAll('#questionsList input')).length} answers...`);
+            addLogEntry('thinking', 'Incorporating your feedback...', true);
+
+            // Collect answers
+            const answers = {};
+            document.querySelectorAll('#questionsList input').forEach(input => {
+                const question = decodeURIComponent(input.dataset.question);
+                const answer = input.value.trim();
+                if (answer) {
+                    answers[question] = answer;
+                }
+            });
+
+            const additionalContext = document.getElementById('additionalContext').value.trim();
+
+            // Progress simulation
+            const refineStages = [
+                'Re-analyzing requirements with new context...',
+                'Updating component definitions...',
+                'Refining data flow mappings...'
+            ];
+            let stageIdx = 0;
+            const refineInterval = setInterval(() => {
+                if (stageIdx < refineStages.length) {
+                    addLogEntry('thinking', refineStages[stageIdx], true);
+                    stageIdx++;
+                }
+            }, 2000);
+
+            try {
+                const response = await fetch('/api/refine_interview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        brief: currentBrief,
+                        answers: answers,
+                        additional_context: additionalContext,
+                        model: getSelectedModel()
+                    })
+                });
+
+                clearInterval(refineInterval);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    currentGraphData = result.data;
+                    currentBrief = result.data.brief;
+                    currentProjectId = result.data.project_id || currentBrief?.project_id || currentProjectId;
+
+                    const compCount = (currentBrief.components || []).length;
+                    const questCount = (currentBrief.questions || []).length;
+
+                    // Update node count in right pane
+                    document.getElementById('nodeCount').textContent = compCount;
+
+                    addLogEntry('success', 'Refinement complete!');
+                    addLogEntry('info', `Updated to ${compCount} components`);
+
+                    // Clear inputs
+                    document.getElementById('additionalContext').value = '';
+
+                    // Check if ready or need more refinement
+                    if (result.data.readyForDesign) {
+                        addLogEntry('success', 'Project is ready for design phase!');
+                        showReadyPhase();
+                    } else {
+                        addLogEntry('info', `${questCount} questions remaining`);
+                        updateClarifySection();
+                        // Diagram is now updated in updateClarifySection with fallback
+                        showStatus('status-clarify', 'success', 'Analysis refined! Please answer any remaining questions.');
+                    }
+                } else {
+                    addLogEntry('error', 'Refinement failed: ' + result.message);
+                    showStatus('status-clarify', 'error', 'Error: ' + result.message);
+                }
+            } catch (err) {
+                clearInterval(refineInterval);
+                addLogEntry('error', 'Connection error: ' + err.message);
+                showStatus('status-clarify', 'error', 'Connection error: ' + err.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Refine Analysis';
+        }
+
+        function skipQuestions() {
+            showReadyPhase();
+        }
+
+        function showReadyPhase() {
+            // Update phase indicators
+            document.getElementById('phase-describe').classList.remove('active');
+            document.getElementById('phase-describe').classList.add('complete');
+            document.getElementById('phase-clarify').classList.remove('active');
+            document.getElementById('phase-clarify').classList.add('complete');
+            document.getElementById('phase-review').classList.add('active');
+
+            // Hide other sections, show ready
+            document.getElementById('section-describe').classList.add('hidden');
+            document.getElementById('section-clarify').classList.add('hidden');
+            document.getElementById('section-ready').classList.remove('hidden');
+
+            // Populate final data
+            document.getElementById('finalSummary').textContent =
+                currentBrief.summary || 'Project analyzed successfully';
+
+            const components = currentBrief.components || [];
+            document.getElementById('componentCount').textContent = components.length;
+
+            const finalComponentsDiv = document.getElementById('finalComponents');
+            finalComponentsDiv.innerHTML = '';
+            components.forEach(comp => {
+                finalComponentsDiv.appendChild(createComponentTag(comp));
+            });
+
+            // Final Diagram update - use server diagram or generate from brief
+            const mermaidCode = (currentGraphData && currentGraphData.mermaidDiagram)
+                ? currentGraphData.mermaidDiagram
+                : generateMermaidFromBrief(currentBrief);
+            if (mermaidCode) {
+                const tryDraw = (attempts = 0) => {
+                    if (window.drawMermaid) {
+                        window.drawMermaid(mermaidCode);
+                    } else if (attempts < 10) {
+                        setTimeout(() => tryDraw(attempts + 1), 200);
+                    }
+                };
+                tryDraw();
+            }
+        }
+
+        function proceedToDesign() {
+            window.location.href = 'Graph.html';
+        }
+
+        function viewGraph() {
+            window.location.href = 'Graph.html';
+        }
+
+        function startOver() {
+            currentBrief = null;
+            currentGraphData = null;
+            selectedComponentId = null;
+            currentProjectId = null;
+
+            // Reset phases
+            document.getElementById('phase-describe').classList.add('active');
+            document.getElementById('phase-describe').classList.remove('complete');
+            document.getElementById('phase-clarify').classList.remove('active');
+            document.getElementById('phase-clarify').classList.remove('complete');
+            document.getElementById('phase-review').classList.remove('active');
+
+            // Show describe, hide others
+            document.getElementById('section-describe').classList.remove('hidden');
+            document.getElementById('section-clarify').classList.add('hidden');
+            document.getElementById('section-ready').classList.add('hidden');
+
+            // Reset form
+            document.getElementById('promptInput').value = '';
+            document.getElementById('btnAnalyze').disabled = false;
+            document.getElementById('btnAnalyze').textContent = 'Analyze Project';
+            hideStatus('status-initial');
+
+            // Reset activity log
+            document.getElementById('activity-log').classList.add('hidden');
+            clearActivityLog();
+
+            // Close detail panel
+            closeDetailPanel();
+
+            // Clear diagram and reset count
+            document.getElementById('mermaid-container').innerHTML = '<p style="color: #444; font-size: 12px; font-family: var(--font-mono);">Diagram will appear after analysis...</p>';
+            document.getElementById('nodeCount').textContent = '0';
+        }
+
+        function showStatus(elementId, type, message) {
+            const el = document.getElementById(elementId);
+            el.className = 'status ' + type;
+            el.textContent = message;
+            el.classList.remove('hidden');
+        }
+
+        function hideStatus(elementId) {
+            document.getElementById(elementId).classList.add('hidden');
+        }
+
+        // Close panels on Escape or click outside
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDetailPanel();
+                document.getElementById('projects-panel').style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            // Close explanation tooltip (but not if clicking inside it)
+            const explainTooltip = document.getElementById('explain-tooltip');
+            if (explainTooltip && explainTooltip.style.display === 'block' &&
+                !e.target.closest('#explain-tooltip') &&
+                !e.target.closest('.editable-list-item input')) {
+                closeExplainTooltip();
+            }
+
+            // Close detail panel (if clicking far outside, not on other interactive elements)
+            const detailPanel = document.getElementById('detail-panel');
+            if (detailPanel && detailPanel.style.display === 'block' &&
+                !e.target.closest('#detail-panel') &&
+                !e.target.closest('.component-tag') &&
+                !e.target.closest('#mermaid-container') &&
+                !e.target.closest('#explain-tooltip')) {
+                // Don't close if there are unsaved changes - let the close function handle confirmation
+                if (!hasUnsavedChanges) {
+                    closeDetailPanel();
+                }
+            }
+
+            // Close projects panel
+            const projectsPanel = document.getElementById('projects-panel');
+            if (projectsPanel && projectsPanel.style.display === 'block' &&
+                !e.target.closest('#projects-panel') &&
+                !e.target.closest('button[onclick*="toggleProjectPanel"]')) {
+                projectsPanel.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>

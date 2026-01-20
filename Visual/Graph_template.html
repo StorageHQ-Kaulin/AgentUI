@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Architecture Graph</title>
+    <style>
+        :root {
+            --bg-color: #0b0d10;
+            --panel-bg: rgba(16, 20, 24, 0.95);
+            --accent-color: #00ffcc;
+            --accent-warn: #ffaa00;
+            --accent-error: #ff4444;
+            --text-color: #e0e0e0;
+            --border-color: #333;
+            --font-mono: 'Consolas', 'Monaco', monospace;
+            --font-main: 'Segoe UI', sans-serif;
+
+            /* File Type Colors */
+            --color-schema: #f1c40f;
+            --color-auth: #e74c3c;
+            --color-api: #3498db;
+            --color-data: #2ecc71;
+            --color-log: #95a5a6;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        #app-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Graph Canvas */
+        #view-graph {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(#222 1px, transparent 1px);
+            background-size: 20px 20px;
+            cursor: grab;
+            overflow: hidden;
+        }
+
+        #view-graph:active {
+            cursor: grabbing;
+        }
+
+        #graph-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform-origin: 0 0;
+        }
+
+        /* Nodes */
+        .node {
+            position: absolute;
+            width: 140px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 12px;
+            color: #ccc;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            z-index: 2;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.2s;
+            user-select: none;
+        }
+
+        .node:hover {
+            border-color: #666;
+            transform: translateY(-2px);
+        }
+
+        .node.root {
+            border-color: var(--accent-color);
+            color: white;
+            font-weight: bold;
+        }
+
+        .node.selected {
+            border-color: var(--accent-warn);
+            box-shadow: 0 0 15px rgba(255, 170, 0, 0.3);
+            z-index: 10;
+        }
+
+        .node-label {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .node-status {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        /* Agent Badge */
+        .node-agent {
+            position: absolute;
+            bottom: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            background: var(--accent-color);
+            color: #000;
+            border-radius: 50%;
+            font-size: 9px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            z-index: 3;
+        }
+
+        /* Connections */
+        svg.connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: visible;
+        }
+
+        path.edge {
+            fill: none;
+            stroke-width: 2px;
+            transition: stroke 0.2s;
+        }
+
+        /* Edge Labels */
+        .edge-label-group {
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .edge-label-group:hover rect {
+            stroke: white;
+            stroke-width: 2px;
+        }
+
+        .edge-label-bg {
+            rx: 4;
+            stroke: #333;
+            stroke-width: 1px;
+        }
+
+        .edge-label-text {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            text-anchor: middle;
+            pointer-events: none;
+            fill: #eee;
+            font-weight: bold;
+        }
+
+        /* Legend */
+        .graph-legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(16, 20, 24, 0.9);
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: #ccc;
+            z-index: 10;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 2px;
+            margin-right: 8px;
+        }
+
+        /* Detail Panel */
+        #detail-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 340px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--accent-color);
+            border-radius: 4px;
+            display: none;
+            z-index: 20;
+            box-shadow: -10px 10px 30px rgba(0, 0, 0, 0.5);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .panel-title {
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .panel-close {
+            cursor: pointer;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .panel-close:hover {
+            color: white;
+        }
+
+        .panel-content {
+            padding: 15px;
+            font-size: 13px;
+        }
+
+        .prop-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .prop-label {
+            color: #888;
+        }
+
+        .prop-val {
+            color: white;
+            font-family: var(--font-mono);
+            text-align: right;
+        }
+
+        /* File Preview */
+        .file-preview {
+            background: #050505;
+            border: 1px solid #333;
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: #aaa;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 200px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+
+        /* Lists & Trees */
+        .subtask-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+
+        .subtask-item {
+            padding: 8px;
+            border-bottom: 1px solid #222;
+            margin-bottom: 5px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 3px;
+        }
+
+        .subtask-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            background: #333;
+        }
+
+        .file-tree-container {
+            background: #080808;
+            border: 1px solid #222;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .ft-item {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 2px 0;
+        }
+
+        .ft-folder {
+            color: #eebb00;
+        }
+
+        .ft-file {
+            color: #aaa;
+        }
+
+        .btn-gen {
+            background: var(--accent-color);
+            color: #000;
+            font-weight: bold;
+            border: none;
+            padding: 8px;
+            width: 100%;
+            margin-top: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+
+        .btn-gen:hover {
+            background: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-container">
+        <div id="view-graph">
+            <div id="graph-content">
+                <svg class="connections" id="graph-svg"></svg>
+                <div id="graph-nodes"></div>
+            </div>
+            <div class="graph-legend">
+                <div style="margin-bottom:5px; font-weight:bold; color:white">DATA FLOW TYPES</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:var(--color-schema)"></div>Schemas
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:var(--color-auth)"></div>Auth/Security
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:var(--color-api)"></div>API/Events
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:var(--color-data)"></div>Data Exports
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:var(--color-log)"></div>Logs
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div id="detail-panel">
+        <div class="panel-header">
+            <div class="panel-title" id="panel-title">DETAILS</div>
+            <div class="panel-close" onclick="UI.closePanel()">×</div>
+        </div>
+        <div class="panel-content" id="panel-body"></div>
+    </div>
+
+    <!-- Full Screen Dashboard Overlay -->
+    <div id="full-dashboard-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; overflow-y:auto; background:rgba(0,0,0,0.92); z-index:2000; flex-direction:column; padding:20px; box-sizing:border-box;">
+
+        <!-- Dashboard Header -->
+        <div
+            style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding-bottom:15px; margin-bottom:20px; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:20px;">
+                <div>
+                    <div
+                        style="font-size:10px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">
+                        COMPONENT DASHBOARD</div>
+                    <h1 id="db-title" style="margin:0; color:#00ffcc; text-transform:uppercase; font-size:24px;"></h1>
+                </div>
+                <!-- Completion Score Circle -->
+                <div id="db-score-container" style="position:relative; width:70px; height:70px;">
+                    <svg width="70" height="70" style="transform:rotate(-90deg);">
+                        <circle cx="35" cy="35" r="30" stroke="#222" stroke-width="6" fill="none" />
+                        <circle id="db-score-ring" cx="35" cy="35" r="30" stroke="#00ffcc" stroke-width="6" fill="none"
+                            stroke-dasharray="188.5" stroke-dashoffset="188.5" stroke-linecap="round" />
+                    </svg>
+                    <div id="db-score-text"
+                        style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:16px; font-weight:bold; color:#fff;">
+                        0%</div>
+                </div>
+            </div>
+            <div style="display:flex; gap:20px; align-items:center;">
+                <div style="text-align:right;">
+                    <div style="font-size:10px; color:#666;">LAST EDITED</div>
+                    <div id="db-last-edited" style="color:#fff; font-family:'Consolas',monospace;"></div>
+                </div>
+                <div onclick="document.getElementById('full-dashboard-overlay').style.display='none'"
+                    style="cursor:pointer; color:#888; font-size:32px; margin-left:20px;">×</div>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div
+            style="display:grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: auto; gap:12px; padding-bottom:20px;">
+
+            <!-- Row 1: Goal (spans 2), Problem -->
+            <div
+                style="background:linear-gradient(135deg, #1a1f25, #0b0d10); border:1px solid #00ffcc33; padding:15px; border-radius:4px; grid-column: 1 / 3;">
+                <h3 style="margin:0 0 10px 0; color:#00ffcc; font-size:13px; text-transform:uppercase;">🎯 Goal</h3>
+                <div id="db-goal" style="color:#fff; font-size:15px; line-height:1.5;"></div>
+            </div>
+            <div style="background:#0b0d10; border:1px solid #ff6b6b33; padding:15px; border-radius:4px;">
+                <h3 style="margin:0 0 10px 0; color:#ff6b6b; font-size:13px; text-transform:uppercase;">⚠️ Problem</h3>
+                <div id="db-problem" style="color:#ccc; font-size:13px; line-height:1.5; font-style:italic;"></div>
+            </div>
+
+            <!-- Row 2: Scope, Requirements, Risks -->
+            <div style="background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px;">
+                <h3 style="margin:0 0 10px 0; color:#3498db; font-size:12px; text-transform:uppercase;">📦 Scope</h3>
+                <ul id="db-scope" style="margin:0; padding-left:18px; font-size:12px; color:#bbb; line-height:1.6;">
+                </ul>
+            </div>
+            <div style="background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px;">
+                <h3 style="margin:0 0 10px 0; color:#9b59b6; font-size:12px; text-transform:uppercase;">📋 Requirements
+                </h3>
+                <ul id="db-requirements"
+                    style="margin:0; padding-left:18px; font-size:12px; color:#bbb; line-height:1.6;"></ul>
+            </div>
+            <div style="background:#0b0d10; border:1px solid #e74c3c33; padding:15px; border-radius:4px;">
+                <h3 style="margin:0 0 10px 0; color:#e74c3c; font-size:12px; text-transform:uppercase;">⚡ Risks</h3>
+                <ul id="db-risks" style="margin:0; padding-left:18px; font-size:12px; color:#aaa; line-height:1.6;">
+                </ul>
+            </div>
+
+            <!-- Row 3: Tasks, Summary+Metrics, Files -->
+            <div
+                style="background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px; display:flex; flex-direction:column; overflow-y:auto;">
+                <h3 style="margin:0 0 10px 0; color:#ffaa00; font-size:12px; text-transform:uppercase;">📋 Tasks</h3>
+                <div id="db-subtasks" style="font-size:13px; color:#ccc; flex:1;"></div>
+                <div
+                    style="padding-top:10px; border-top:1px solid #222; font-size:11px; color:#888; font-family:'Consolas',monospace;">
+                    STATUS: <span id="db-status" style="color:#fff"></span><br>
+                    OWNER: <span id="db-owner" style="color:#fff"></span>
+                </div>
+            </div>
+            <div
+                style="background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px; display:flex; flex-direction:column;">
+                <h3 style="margin:0 0 10px 0; color:#888; font-size:12px; text-transform:uppercase;">Summary</h3>
+                <div id="db-desc"
+                    style="color:#e0e0e0; font-size:13px; line-height:1.5; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #222;">
+                </div>
+
+                <!-- Agent Control Panel (User Interaction) -->
+                <div id="db-agent-panel" style="display:none; margin-bottom:15px;"></div>
+
+                <h3 style="margin:0 0 8px 0; color:#f39c12; font-size:11px; text-transform:uppercase;">📊 Metrics (vs
+                    Requirements)</h3>
+                <div id="db-metrics" style="font-size:11px; color:#ccc; flex:1; overflow-y:auto;"></div>
+            </div>
+            <div
+                style="background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px; display:flex; flex-direction:column;">
+                <h3 style="margin:0 0 10px 0; color:#888; font-size:12px; text-transform:uppercase;">Files</h3>
+                <div id="db-files"
+                    style="flex:1; overflow-y:auto; font-family:'Consolas',monospace; font-size:12px; color:#aaa;">
+                </div>
+            </div>
+
+            <!-- Row 4: Inputs, Outputs, Timeline -->
+            <div style="grid-column: 1 / 4; display:flex; gap:12px; min-height:120px;">
+                <div style="flex:1; background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px;">
+                    <h3 style="margin:0 0 10px 0; color:#3498db; font-size:12px; text-transform:uppercase;">📥 Inputs
+                    </h3>
+                    <div id="db-inputs" style="font-size:13px; color:#ccc; display:flex; flex-wrap:wrap; gap:8px;">
+                    </div>
+                </div>
+                <div style="flex:1; background:#0b0d10; border:1px solid #333; padding:15px; border-radius:4px;">
+                    <h3 style="margin:0 0 10px 0; color:#2ecc71; font-size:12px; text-transform:uppercase;">📤 Outputs
+                    </h3>
+                    <div id="db-outputs" style="font-size:13px; color:#ccc; display:flex; flex-wrap:wrap; gap:8px;">
+                    </div>
+                </div>
+                <div style="flex:1; background:#0b0d10; border:1px solid #1abc9c33; padding:15px; border-radius:4px;">
+                    <h3 style="margin:0 0 10px 0; color:#1abc9c; font-size:12px; text-transform:uppercase;">🧪 Test
+                        Cases</h3>
+                    <div id="db-timeline" style="font-size:11px; color:#ccc; overflow-y:auto; max-height:100px;"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Global Task List Button & Panel -->
+    <div id="task-list-panel"
+        style="position:absolute; bottom:20px; right:20px; width:300px; background:var(--panel-bg); border:1px solid var(--border-color); border-radius:4px; display:none; z-index:100; box-shadow:-5px -5px 20px rgba(0,0,0,0.5);">
+        <div class="panel-header">
+            <div class="panel-title">GLOBAL TASKS</div>
+            <div class="panel-close" onclick="document.getElementById('task-list-panel').style.display='none'">×</div>
+        </div>
+        <div class="panel-content">
+            <ul id="global-task-ul" style="padding-left:20px; margin:0; list-style:none;">
+                <!-- Populated via JS -->
+            </ul>
+        </div>
+    </div>
+    <button onclick="document.getElementById('task-list-panel').style.display='block'"
+        style="position:absolute; bottom:20px; right:20px; z-index:90; padding:10px 15px; background:var(--accent-color); border:none; border-radius:4px; font-weight:bold; cursor:pointer; box-shadow:0 0 10px rgba(0,255,204,0.3);">
+        📋 TASKS
+    </button>
+
+    <script>
+        // --- Data ---
+        // INSTRUCTIONS:
+        // Replace this 'ProjectData' object with your own JSON configuration to define the project plan.
+        const ProjectData = {
+            projectName: "Agent Project Template",
+            projectSummary: "A template for building agentic workflow visualizations.",
+
+            // 1. GLOBAL TASKS: High-level project phases
+            globalTasks: [
+                { text: "Phase 1: Planning - Define scope", done: true },
+                { text: "Phase 2: Execution - Agents work", done: false },
+                { text: "Phase 3: Review - Validate output", done: false }
+            ],
+
+            // 2. AGENTS: The workforce available
+            agents: [
+                { id: 'A1', name: 'Worker Agent', dept: 'OPS', initials: 'WK', status: 'active' },
+                { id: 'A2', name: 'Review Agent', dept: 'QA', initials: 'QA', status: 'idle' }
+            ],
+
+            // 3. NODES: The logic flow components
+            nodes: [
+                {
+                    id: 'ROOT', label: 'Project Goal', x: 500, y: 50, type: 'root', agentId: null, status: 'active',
+                    summary: "Overall project objective.",
+                    problem: "Define the problem being solved here.",
+                    goals: ["Objective 1", "Objective 2"],
+                    inputs: ["Initial Requirement"], outputs: ["Final Deliverable"],
+                    metrics: [{ req: "Main KPI", value: "50%", status: "partial" }],
+                    risks: ["Risk A", "Risk B"],
+                    testCases: [], subtasks: [], files: []
+                },
+                {
+                    id: 'TASK_1', label: 'Execution', x: 400, y: 200, type: 'node', agentId: 'A1', status: 'active',
+                    summary: "Primary execution phase.",
+                    inputs: ["Requirements"], outputs: ["Draft Artifact"],
+                    metrics: [{ req: "Speed", value: "High", status: "pass" }],
+                    subtasks: [{ title: "Step 1", logic: "Do X" }], files: []
+                },
+                {
+                    id: 'TASK_2', label: 'Review', x: 600, y: 200, type: 'node', agentId: 'A2', status: 'pending',
+                    summary: "Quality assurance phase.",
+                    inputs: ["Draft Artifact"], outputs: ["Final Report"],
+                    metrics: [], subtasks: [], files: []
+                }
+            ],
+
+            // 4. EDGES: Connections between nodes (data flow)
+            // Types: 'data', 'api', 'auth', 'schema', 'log'
+            edges: [
+                { from: 'ROOT', to: 'TASK_1', label: 'Start', type: 'data' },
+                { from: 'ROOT', to: 'TASK_2', label: 'Control', type: 'auth' },
+                { from: 'TASK_1', to: 'TASK_2', label: 'Handoff', type: 'data' }
+            ]
+        };
+
+        // Mapping Data to State
+        const GlobalTasks = ProjectData.globalTasks;
+        const Agents = ProjectData.agents;
+        const Level1 = { nodes: ProjectData.nodes, edges: ProjectData.edges };
+
+        // Internal State
+        const State = {
+            agents: Agents,
+            graphNodes: Level1.nodes,
+            graphEdges: Level1.edges,
+            graphPan: { x: 0, y: 0 },
+            currentLevel: 1
+        };
+
+        // --- Logic ---
+        let dragNodeId = null;
+        let dragOffset = { x: 0, y: 0 };
+        let isGraphPanning = false;
+        let panStart = { x: 0, y: 0 };
+
+        const UI = {
+            makeDraggable: (elId, handleSelector) => {
+                const el = document.getElementById(elId);
+                const handle = el ? el.querySelector(handleSelector) : null;
+                if (!el || !handle) return;
+
+                handle.style.cursor = 'grab';
+                let isDragging = false;
+                let startX, startY, initialLeft, initialTop;
+
+                handle.onmousedown = (e) => {
+                    e.preventDefault();
+                    isDragging = true;
+                    handle.style.cursor = 'grabbing';
+
+                    const rect = el.getBoundingClientRect();
+                    el.style.left = rect.left + 'px';
+                    el.style.top = rect.top + 'px';
+                    el.style.bottom = 'auto';
+                    el.style.right = 'auto';
+
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    initialLeft = rect.left;
+                    initialTop = rect.top;
+
+                    const onMove = (e) => {
+                        if (!isDragging) return;
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+                        el.style.left = (initialLeft + dx) + 'px';
+                        el.style.top = (initialTop + dy) + 'px';
+                    };
+
+                    const onUp = () => {
+                        isDragging = false;
+                        handle.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                };
+            },
+
+            init: () => {
+                const container = document.getElementById('app-container');
+                // Button removed for simplified template
+
+                UI.renderGraph();
+                UI.renderGlobalTasks();
+
+                // Initialize Draggable Panels
+                UI.makeDraggable('detail-panel', '.panel-header');
+                UI.makeDraggable('task-list-panel', '.panel-header');
+            },
+
+            renderGlobalTasks: () => {
+                const list = document.getElementById('global-task-ul');
+                list.innerHTML = GlobalTasks.map(t => `
+        <li
+            style="margin-bottom:8px; display:flex; align-items:center; color:${t.done ? '#666' : '#fff'}; text-decoration:${t.done ? 'line-through' : 'none'}">
+            <span style="color:${t.done ? '#00ffcc' : '#ffaa00'}; margin-right:8px; font-weight:bold;">${t.done ? '✓' :
+                        '○'}</span>
+            ${t.text}
+        </li>
+        `).join('');
+            },
+
+            // Calculate weighted completion score
+            calculateScore: (node) => {
+                // Default weights: Metrics = 60%, Test Cases = 40%
+                const METRICS_WEIGHT = 0.6;
+                const TESTS_WEIGHT = 0.4;
+
+                let metricsScore = 0;
+                let testsScore = 0;
+                let hasMetrics = false;
+                let hasTests = false;
+
+                // Calculate metrics score (based on pass/fail status and individual weights)
+                if (node.metrics && node.metrics.length > 0 && typeof node.metrics[0] === 'object') {
+                    hasMetrics = true;
+                    let totalWeight = 0;
+                    let earnedWeight = 0;
+
+                    node.metrics.forEach(m => {
+                        const weight = m.weight || 1; // Default weight of 1 if not specified
+                        totalWeight += weight;
+                        if (m.status === 'pass') {
+                            earnedWeight += weight;
+                        } else if (m.status === 'partial') {
+                            earnedWeight += weight * 0.5;
+                        }
+                    });
+
+                    metricsScore = totalWeight > 0 ? (earnedWeight / totalWeight) * 100 : 0;
+                }
+
+                // Calculate test cases score
+                if (node.testCases && node.testCases.length > 0) {
+                    hasTests = true;
+                    let totalWeight = 0;
+                    let earnedWeight = 0;
+
+                    node.testCases.forEach(tc => {
+                        const weight = tc.weight || 1; // Default weight of 1
+                        totalWeight += weight;
+                        if (tc.status === 'pass') {
+                            earnedWeight += weight;
+                        } else if (tc.status === 'partial') {
+                            earnedWeight += weight * 0.5;
+                        }
+                    });
+
+                    testsScore = totalWeight > 0 ? (earnedWeight / totalWeight) * 100 : 0;
+                }
+
+                // Calculate weighted final score
+                let finalScore = 0;
+                if (hasMetrics && hasTests) {
+                    finalScore = (metricsScore * METRICS_WEIGHT) + (testsScore * TESTS_WEIGHT);
+                } else if (hasMetrics) {
+                    finalScore = metricsScore;
+                } else if (hasTests) {
+                    finalScore = testsScore;
+                } else {
+                    // Fallback: check node status
+                    if (node.status === 'complete') finalScore = 100;
+                    else if (node.status === 'active') finalScore = 50;
+                    else if (node.status === 'pending') finalScore = 0;
+                }
+
+                return {
+                    total: Math.round(finalScore),
+                    metricsScore: Math.round(metricsScore),
+                    testsScore: Math.round(testsScore),
+                    hasMetrics,
+                    hasTests
+                };
+            },
+
+            // Render the "Live" Agent Control Panel
+            renderAgentControl: (node, agentName) => {
+                const isAgent = node.type === 'node' || node.input === 'AGENT'; // Simple check
+                // Randomized dummy data for demo
+                const sessionID = 'sess_' + Math.random().toString(36).substr(2, 6);
+                const iteration = Math.floor(Math.random() * 20) + 1;
+                const cost = (Math.random() * 5).toFixed(2);
+                const progress = Math.floor(Math.random() * 100);
+
+                // Criteria map from node metrics/tasks
+                let criteriaHtml = '';
+                if (node.metrics && node.metrics.length) {
+                    criteriaHtml = node.metrics.slice(0, 4).map(m => {
+                        const text = typeof m === 'object' ? m.req : m;
+                        const status = typeof m === 'object' ? m.status : (Math.random() > 0.5 ? 'pass' : 'pending');
+                        const icon = status === 'pass' ? '✓' : '○';
+                        return `<div style="font-family:'Consolas',monospace; font-size:11px; color:${status === 'pass' ? '#2ecc71' : '#888'}">${icon} ${text}</div>`;
+                    }).join('');
+                } else {
+                    criteriaHtml = '<div style="color:#666; font-size:10px;">Waiting for criteria...</div>';
+                }
+
+                // Logs
+                const logs = [
+                    "Checking availability...",
+                    "Connecting to proxy...",
+                    "Parsing response...",
+                    "WARN: Retrying request...",
+                    "Success: Data extracted"
+                ];
+                const activeLogs = logs.sort(() => 0.5 - Math.random()).slice(0, 3).map(l =>
+                    `<div style="font-family:'Consolas',monospace; font-size:10px; color:#aaa;">${new Date().toLocaleTimeString().split(' ')[0]} > ${l}</div>`
+                ).join('');
+
+                const progressBar = `
+                    <div style="height:10px; background:#222; margin:5px 0;">
+                        <div style="width:${progress}%; height:100%; background:repeating-linear-gradient(45deg, #3498db, #3498db 10px, #2980b9 10px, #2980b9 20px);"></div>
+                    </div>
+                `;
+
+                return `
+                    <div style="background:#000; border:1px solid #444; color:#fff; font-family:'Consolas', 'Courier New', monospace; box-shadow:0 0 15px rgba(0,0,0,0.5);">
+                        <!-- Header -->
+                        <div style="background:#222; padding:5px 10px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:bold; color:#fff;">TERMINAL: ${node.label.toUpperCase()}</span>
+                            <span style="color:#888;">[●]</span>
+                        </div>
+                        
+                        <!-- Info -->
+                        <div style="padding:10px; border-bottom:1px solid #333;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span style="color:#888;">Status: <span style="color:#2ecc71;">ACTIVE</span></span>
+                                <span style="color:#888;">Agent: <span style="color:#fff;">${agentName}</span></span>
+                            </div>
+                            <div style="color:#666; font-size:11px;">Session: ${sessionID}</div>
+                        </div>
+
+                        <!-- Progress & Cost -->
+                        <div style="padding:10px; border-bottom:1px solid #333; background:#0b0d10;">
+                            <div style="display:flex; justify-content:space-between; font-size:11px; color:#ccc;">
+                                <span>Progress: ${progress}%</span>
+                                <span>Iter: ${iteration}/20</span>
+                            </div>
+                            ${progressBar}
+                            <div style="font-size:11px; color:#888;">Cost: <span style="color:#f39c12;">$${cost}</span> of $10.00</div>
+                        </div>
+
+                        <!-- Criteria -->
+                        <div style="padding:10px; border-bottom:1px solid #333;">
+                            <div style="color:#666; font-size:10px; margin-bottom:4px; text-transform:uppercase;">Criteria Check:</div>
+                            ${criteriaHtml}
+                        </div>
+
+                        <!-- Logs -->
+                        <div style="padding:10px; background:#050505; border-bottom:1px solid #333; min-height:50px;">
+                            ${activeLogs}
+                        </div>
+
+                        <!-- Controls -->
+                        <div style="padding:8px; background:#222; display:flex; gap:8px;">
+                            <button style="background:#e74c3c; border:none; color:#fff; padding:4px 8px; font-size:10px; cursor:pointer;">[ PAUSE ]</button>
+                            <button style="background:#f39c12; border:none; color:#fff; padding:4px 8px; font-size:10px; cursor:pointer;">[ REASSIGN ]</button>
+                            <button style="background:#3498db; border:none; color:#fff; padding:4px 8px; font-size:10px; cursor:pointer;">[ CONTEXT ]</button>
+                            <button style="background:#9b59b6; border:none; color:#fff; padding:4px 8px; font-size:10px; cursor:pointer;">[ PR ]</button>
+                        </div>
+                    </div>
+                `;
+            },
+
+            toggleView: () => {
+                if (State.currentLevel === 1) {
+                    State.graphNodes = Level2.nodes;
+                    State.graphEdges = Level2.edges;
+                    State.currentLevel = 2;
+                } else {
+                    State.graphNodes = Level1.nodes;
+                    State.graphEdges = Level1.edges;
+                    State.currentLevel = 1;
+                }
+                UI.renderGraph();
+            },
+
+            showDetailedModal: (id) => {
+                const node = State.graphNodes.find(n => n.id === id);
+                if (!node) return;
+
+                const agent = State.agents.find(a => a.id === node.agentId);
+                const agentName = agent ? agent.name : 'Unassigned';
+
+                // Helper for list rendering
+                const renderList = (arr, fallback = "None specified.") => {
+                    if (!arr || arr.length === 0) return `<li style="color:#666; font-style:italic">${fallback}</li>`;
+                    return arr.map(item => `<li>${item}</li>`).join('');
+                };
+
+                // Header
+                document.getElementById('db-title').innerText = node.label + " (" + node.id + ")";
+                document.getElementById('db-last-edited').innerText = node.lastEdited || "Unknown";
+
+                // Calculate and display completion score
+                const score = UI.calculateScore(node);
+                const circumference = 188.5; // 2 * PI * 30
+                const offset = circumference - (score.total / 100) * circumference;
+
+                // Update score ring
+                const ring = document.getElementById('db-score-ring');
+                ring.style.strokeDashoffset = offset;
+
+                // Color based on score
+                let scoreColor = '#e74c3c'; // Red for low
+                if (score.total >= 70) scoreColor = '#2ecc71'; // Green
+                else if (score.total >= 40) scoreColor = '#f39c12'; // Orange
+                ring.style.stroke = scoreColor;
+
+                // Update score text
+                document.getElementById('db-score-text').innerText = score.total + '%';
+                document.getElementById('db-score-text').style.color = scoreColor;
+
+                // Goal
+                document.getElementById('db-goal').innerText = node.goal || node.summary || "No goal defined.";
+
+                // Problem
+                document.getElementById('db-problem').innerText = node.problem || "No problem statement defined.";
+
+                // Scope
+                document.getElementById('db-scope').innerHTML = renderList(node.scope);
+
+                // Requirements
+                document.getElementById('db-requirements').innerHTML = renderList(node.requirements);
+
+                // Risks
+                document.getElementById('db-risks').innerHTML = renderList(node.risks, "No risks identified.");
+
+                // Summary (description)
+                document.getElementById('db-desc').innerText = node.description || node.summary || "No description available.";
+
+                // Render Agent Control Panel
+                const agentPanelContainer = document.getElementById('db-agent-panel');
+                if (agentPanelContainer) {
+                    agentPanelContainer.innerHTML = UI.renderAgentControl(node, agentName);
+                    agentPanelContainer.style.display = 'block';
+                }
+
+                // Metrics (show as requirement -> metric pairs with status and weight)
+                let metricsHtml = '<div style="color:#666; font-style:italic;">No metrics defined.</div>';
+                if (node.metrics && node.metrics.length > 0) {
+                    // If metrics is an array of objects with requirement/value/status
+                    if (typeof node.metrics[0] === 'object') {
+                        // Show score breakdown header
+                        // Show score breakdown header
+                        metricsHtml = `
+                            <div style="display:flex; justify-content:space-between; padding:4px 8px; margin-bottom:8px; background:#1a1f25; border-radius:4px;">
+                                <span style="color:#f39c12; font-size:9px;">METRICS SCORE: ${score.metricsScore}%</span>
+                                <span style="color:#888; font-size:9px;">Weight: 60%</span>
+                            </div>
+                            <!-- Column Headers -->
+                            <div style="display:flex; justify-content:space-between; padding:0 2px; margin-bottom:2px;">
+                                <span style="color:#666; font-size:8px; text-transform:uppercase; letter-spacing:0.5px;">Actual</span>
+                                <span style="color:#666; font-size:8px; text-transform:uppercase; letter-spacing:0.5px;">Goal</span>
+                            </div>
+                        `;
+
+                        metricsHtml += node.metrics.map(m => {
+                            const weight = m.weight || 1;
+                            const weightBadge = weight > 1 ? `<span style="background:#9b59b622; color:#9b59b6; font-size:8px; padding:1px 4px; border-radius:2px; margin-left:4px;">×${weight}</span>` : '';
+                            const statusColor = m.status === 'pass' ? '#2ecc71' : m.status === 'fail' ? '#e74c3c' : '#fff';
+
+                            // Parse percentage for bar width
+                            let pct = 0;
+                            const valStr = (m.value || '').toString();
+                            if (valStr.includes('/')) {
+                                const parts = valStr.split('/');
+                                pct = (parseFloat(parts[0]) / parseFloat(parts[1])) * 100;
+                            } else if (valStr.match(/(\d+(\.\d+)?)%/)) {
+                                pct = parseFloat(valStr.match(/(\d+(\.\d+)?)%/)[1]);
+                            } else {
+                                // Fallback
+                                pct = m.status === 'pass' ? 100 : (m.status === 'fail' ? 15 : 50);
+                            }
+                            if (isNaN(pct)) pct = 0;
+                            pct = Math.min(100, Math.max(0, pct));
+
+                            return `
+                            <div style="padding:6px 0; border-bottom:1px solid #222;">
+                                <!-- Labels Row -->
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px;">
+                                    <div style="color:${statusColor}; font-weight:bold; font-size:12px;">
+                                        ${m.value || '—'}${weightBadge}
+                                    </div>
+                                    <div style="color:#888; font-size:10px; text-align:right; max-width:60%;">
+                                        ${m.requirement || m.req || 'Goal'}
+                                    </div>
+                                </div>
+                                
+                                <!-- Scale Bar -->
+                                <div style="height:6px; background:#222; border-radius:3px; position:relative; overflow:hidden;">
+                                    <div style="width:${pct}%; height:100%; background:${statusColor}; transition:width 0.5s ease-out; box-shadow:0 0 5px ${statusColor}44;"></div>
+                                </div>
+                            </div>
+                        `;
+                        }).join('');
+                    } else {
+                        // Fallback: simple string array - pair with requirements if available
+                        if (node.requirements && node.requirements.length > 0) {
+                            metricsHtml = node.requirements.map((req, i) => `
+                                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #222;">
+                                    <span style="color:#9b59b6;">${req}</span>
+                                    <span style="color:#f39c12; font-weight:bold;">${node.metrics[i] || '—'}</span>
+                                </div>
+                            `).join('');
+                        } else {
+                            metricsHtml = node.metrics.map(m => `<div style="padding:2px 0;">• ${m}</div>`).join('');
+                        }
+                    }
+                }
+                document.getElementById('db-metrics').innerHTML = metricsHtml;
+
+                // Tasks (subtasks)
+                const subtasksHtml = node.subtasks && node.subtasks.length > 0 ? node.subtasks.map(s => `
+                    <div style="border-bottom:1px solid #222; padding:4px 0;">
+                        <div style="font-weight:bold; color:#fff; font-size:10px;">➢ ${s.title}</div>
+                        <div style="font-size:9px; color:#888; margin-top:2px;">${s.logic}</div>
+                    </div>
+                `).join('') : '<div style="color:#666; font-style:italic; font-size:10px;">No tasks defined.</div>';
+                document.getElementById('db-subtasks').innerHTML = subtasksHtml;
+
+                // Status & Owner
+                document.getElementById('db-status').innerText = node.status ? node.status.toUpperCase() : 'UNKNOWN';
+                document.getElementById('db-status').style.color = node.status === 'blocked' ? '#ff4444' : '#00ffcc';
+                document.getElementById('db-owner').innerText = agentName;
+
+                // Inputs (badge style)
+                const inputsHtml = node.inputs && node.inputs.length > 0 ? node.inputs.map(i => `
+                    <span style="background:#3498db22; color:#3498db; padding:3px 6px; border-radius:3px; font-size:9px;">${i}</span>
+                `).join('') : '<span style="color:#666; font-style:italic; font-size:9px;">None</span>';
+                document.getElementById('db-inputs').innerHTML = inputsHtml;
+
+                // Outputs (badge style)
+                const outputsHtml = node.outputs && node.outputs.length > 0 ? node.outputs.map(o => `
+                    <span style="background:#2ecc7122; color:#2ecc71; padding:3px 6px; border-radius:3px; font-size:9px;">${o}</span>
+                `).join('') : '<span style="color:#666; font-style:italic; font-size:9px;">None</span>';
+                document.getElementById('db-outputs').innerHTML = outputsHtml;
+
+                // Test Cases (renamed from Timeline) - show as test cases with pass/fail/pending and weights
+                let testCasesHtml = '<div style="color:#666; font-style:italic;">No test cases defined.</div>';
+                if (node.testCases && node.testCases.length > 0) {
+                    // Show score breakdown header
+                    testCasesHtml = `
+                        <div style="display:flex; justify-content:space-between; padding:4px 8px; margin-bottom:8px; background:#1a1f25; border-radius:4px;">
+                            <span style="color:#1abc9c; font-size:9px;">TEST SCORE: ${score.testsScore}%</span>
+                            <span style="color:#888; font-size:9px;">Weight: 40%</span>
+                        </div>
+                    `;
+                    testCasesHtml += node.testCases.map(tc => {
+                        const weight = tc.weight || 1;
+                        const weightBadge = weight > 1 ? `<span style="background:#1abc9c22; color:#1abc9c; font-size:8px; padding:1px 4px; border-radius:2px; margin-left:4px;">×${weight}</span>` : '';
+                        const statusIcon = tc.status === 'pass' ? '✓' : tc.status === 'fail' ? '✗' : '○';
+                        const statusColor = tc.status === 'pass' ? '#2ecc71' : tc.status === 'fail' ? '#e74c3c' : '#888';
+                        const bgColor = tc.status === 'pass' ? '#2ecc7111' : tc.status === 'fail' ? '#e74c3c11' : 'transparent';
+                        return `
+                            <div style="display:flex; align-items:center; padding:4px 6px; margin-bottom:3px; background:${bgColor}; border-radius:3px;">
+                                <span style="color:${statusColor}; font-weight:bold; margin-right:8px; font-size:12px;">${statusIcon}</span>
+                                <span style="flex:1; color:${tc.status === 'pass' ? '#888' : '#ccc'}; ${tc.status === 'pass' ? 'text-decoration:line-through;' : ''}">${tc.name}${weightBadge}</span>
+                                ${tc.value ? `<span style="color:#888; font-size:9px; margin-left:8px;">${tc.value}</span>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                } else if (node.timeline && node.timeline.length > 0) {
+                    // Fallback to timeline format for backward compatibility
+                    testCasesHtml = node.timeline.map((t, i) => `
+                        <div style="display:flex; align-items:center; margin-bottom:4px;">
+                            <div style="width:14px; height:14px; border-radius:50%; background:${t.done ? '#2ecc71' : '#333'}; display:flex; align-items:center; justify-content:center; font-size:8px; margin-right:6px; color:#fff;">
+                                ${t.done ? '✓' : i + 1}</div>
+                            <div style="font-size:9px; color:${t.done ? '#888' : '#ccc'}; ${t.done ? 'text-decoration:line-through;' : ''}">
+                                ${t.phase}</div>
+                        </div>
+                    `).join('');
+                }
+                document.getElementById('db-timeline').innerHTML = testCasesHtml;
+
+                // Files
+                let fileHtml = '<span style="color:#666; font-style:italic">No files.</span>';
+                if (node.files && node.files.length > 0) {
+                    fileHtml = UI.renderFileTree(node.files);
+                }
+                document.getElementById('db-files').innerHTML = fileHtml;
+
+                document.getElementById('full-dashboard-overlay').style.display = 'flex';
+            },
+
+            renderGraph: () => {
+                const container = document.getElementById('graph-nodes');
+                const content = document.getElementById('graph-content');
+
+                // Apply Pan
+                content.style.transform = `translate(${State.graphPan.x}px, ${State.graphPan.y}px)`;
+
+                // Render Nodes
+                container.innerHTML = State.graphNodes.map(n => {
+                    const agent = State.agents.find(a => a.id === n.agentId);
+                    const badge = agent ? `<div class="node-agent">${agent.initials}</div>` : '';
+                    const isSelected = document.getElementById('detail-panel').style.display === 'block' &&
+                        document.getElementById('panel-title').innerText === 'COMPONENT DETAIL' &&
+                        document.querySelector('.prop-val').innerText === n.label; // Simple check
+
+                    return `
+        <div class="node ${n.type || ''} ${isSelected ? 'selected' : ''}" style="left:${n.x}px; top:${n.y}px"
+            onmousedown="window.graphDragStart(event, '${n.id}')" onclick="window.selectGraphNode('${n.id}')"
+            ondblclick="window.UI.showDetailedModal('${n.id}')">
+            <span class="node-label">${n.label}</span>
+            <span class="node-status">${n.status}</span>
+            ${badge}
+        </div>
+        `;
+                }).join('');
+
+                UI.updateConnections();
+            },
+
+            updateConnections: () => {
+                const svg = document.getElementById('graph-svg');
+                let svgHtml = '';
+
+                State.graphEdges.forEach((edge, index) => {
+                    const n1 = State.graphNodes.find(n => n.id === edge.from);
+                    const n2 = State.graphNodes.find(n => n.id === edge.to);
+
+                    if (n1 && n2) {
+                        const x1 = n1.x + 70, y1 = n1.y + 50;
+                        const x2 = n2.x + 70, y2 = n2.y;
+
+                        // Bezier
+                        const cp1x = x1;
+                        const cp1y = y1 + 50;
+                        const cp2x = x2;
+                        const cp2y = y2 - 50;
+
+                        let color = '#444';
+                        if (edge.type === 'schema') color = 'var(--color-schema)';
+                        if (edge.type === 'auth') color = 'var(--color-auth)';
+                        if (edge.type === 'api') color = 'var(--color-api)';
+                        if (edge.type === 'data') color = 'var(--color-data)';
+                        if (edge.type === 'log') color = 'var(--color-log)';
+
+                        svgHtml += `
+        <path class="edge" d="M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}" stroke="${color}" />`;
+
+                        // Label Midpoint
+                        const t = 0.5;
+                        const mx = Math.pow(1 - t, 3) * x1 + 3 * Math.pow(1 - t, 2) * t * cp1x + 3 * (1 - t) * Math.pow(t, 2) * cp2x +
+                            Math.pow(t, 3) * x2;
+                        const my = Math.pow(1 - t, 3) * y1 + 3 * Math.pow(1 - t, 2) * t * cp1y + 3 * (1 - t) * Math.pow(t, 2) * cp2y +
+                            Math.pow(t, 3) * y2;
+
+                        const textWidth = edge.label.length * 6 + 10;
+
+                        svgHtml += `
+        <g class="edge-label-group" onclick="window.selectFileConnection(${index})">
+            <rect x="${mx - textWidth / 2}" y="${my - 10}" width="${textWidth}" height="20" rx="4" fill="#0b0d10"
+                stroke="${color}" class="edge-label-bg" />
+            <text x="${mx}" y="${my + 4}" font-family="monospace" font-size="10" fill="${color}" text-anchor="middle"
+                class="edge-label-text">${edge.label}</text>
+        </g>
+        `;
+                    }
+                });
+                svg.innerHTML = svgHtml;
+            },
+
+            openComponentPanel: (node) => {
+                const p = document.getElementById('detail-panel');
+                const b = document.getElementById('panel-body');
+                document.getElementById('panel-title').innerText = 'COMPONENT DETAIL';
+                p.style.display = 'block';
+
+                const agent = State.agents.find(a => a.id === node.agentId);
+                const agentName = agent ? agent.name : 'Unassigned';
+
+                const subtasksHtml = node.subtasks.length > 0 ? node.subtasks.map(s => `
+        <div class="subtask-item">
+            <div style="font-weight:bold; color:#fff">${s.title}</div>
+            <div style="font-size:10px; color:#888; margin-top:2px;">${s.logic}</div>
+        </div>
+        `).join('') : '<div style="color:#666; font-style:italic">No subtasks</div>';
+
+                const renderFileTree = (items, depth = 0) => {
+                    let html = '';
+                    items.forEach(item => {
+                        const p = depth * 10;
+                        const icon = item.type === 'folder' ? '📁' : '📄';
+                        const cls = item.type === 'folder' ? 'ft-folder' : 'ft-file';
+                        html += `<div class="ft-item" style="padding-left:${p}px"><span class="${cls}">${icon} ${item.name}</span></div>
+        `;
+                        if (item.children) html += renderFileTree(item.children, depth + 1);
+                    });
+                    return html;
+                }
+
+                const fileTreeHtml = node.files.length > 0 ? `<div class="file-tree-container">${renderFileTree(node.files)}
+        </div>` : '<div style="color:#666">No files</div>';
+
+                b.innerHTML = `
+        <div class="prop-row"><span class="prop-label">Component</span><span class="prop-val">${node.label}</span></div>
+        <div class="prop-row"><span class="prop-label">Status</span><span class="prop-val"
+                style="color:${node.status === 'blocked' ? '#ff4444' : '#00ffcc'}">${node.status.toUpperCase()}</span>
+        </div>
+        <div class="prop-row"><span class="prop-label">Owner</span><span class="prop-val">${agentName}</span></div>
+
+        <div style="margin-top:15px; padding-top:10px; border-top:1px solid #333;">
+            <div class="prop-label" style="margin-bottom:5px; color:#fff">FILE STRUCTURE</div>
+            ${fileTreeHtml}
+        </div>
+
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid #333;">
+            <div class="prop-label" style="margin-bottom:5px; color:#fff">SUBTASKS</div>
+            <div class="subtask-list">${subtasksHtml}</div>
+        </div>
+
+        <button class="btn-gen" onclick="alert('Agent dispatched!')">✨ Auto-Generate Tasks</button>
+        `;
+            },
+
+            openFilePanel: (edge) => {
+                const p = document.getElementById('detail-panel');
+                const b = document.getElementById('panel-body');
+                document.getElementById('panel-title').innerText = 'DATA ARTIFACT';
+                p.style.display = 'block';
+
+                // Mock Content generator (simplified)
+                let content = "// Binary data or unknown format";
+                if (edge.type === 'schema') content = `{\n "$schema": "http://json-schema.org/draft-07/schema",\n "type":
+        "object"\n}`;
+                if (edge.type === 'auth') content = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`;
+
+                let color = '#fff';
+                if (edge.type === 'schema') color = 'var(--color-schema)';
+                if (edge.type === 'auth') color = 'var(--color-auth)';
+
+                b.innerHTML = `
+        <div class="prop-row"><span class="prop-label">Filename</span><span class="prop-val"
+                style="color:${color}">${edge.label}</span></div>
+        <div class="prop-row"><span class="prop-label">Type</span><span
+                class="prop-val">${edge.type.toUpperCase()}</span></div>
+
+        <div style="margin: 15px 0; border-top: 1px solid #333; padding-top:10px;">
+            <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:5px;">Description</div>
+            <div style="font-size:12px; color:#ccc; margin-bottom: 15px;">${edge.description}</div>
+
+            <div style="color:#888; font-size:10px; text-transform:uppercase; margin-bottom:5px;">Preview</div>
+            <div class="file-preview">${content}</div>
+        </div>
+        `;
+            },
+
+            closePanel: () => {
+                document.getElementById('detail-panel').style.display = 'none';
+            }
+        };
+
+        // --- Interaction ---
+        window.openFile = async (path) => {
+            if (!path) return;
+            console.log("Opening file:", path);
+            try {
+                const res = await fetch(`/open?path=${encodeURIComponent(path)}`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    console.log("File opened successfully");
+                } else {
+                    alert("Error opening file: " + data.message);
+                }
+            } catch (e) {
+                console.error("Request failed", e);
+                alert("Failed to communicate with local server.");
+            }
+        };
+
+        window.graphDragStart = (e, id) => {
+            if (e.button !== 0) return;
+            e.stopPropagation();
+            dragNodeId = id;
+            const node = State.graphNodes.find(n => n.id === id);
+            const container = document.getElementById('view-graph').getBoundingClientRect();
+            dragOffset.x = (e.clientX - container.left - State.graphPan.x) - node.x;
+            dragOffset.y = (e.clientY - container.top - State.graphPan.y) - node.y;
+        };
+
+        window.selectGraphNode = (id) => {
+            const node = State.graphNodes.find(n => n.id === id);
+            if (node) UI.openComponentPanel(node);
+            window.event.stopPropagation();
+        };
+
+        window.selectFileConnection = (index) => {
+            const edge = State.graphEdges[index];
+            if (edge) UI.openFilePanel(edge);
+            window.event.stopPropagation();
+        };
+
+        window.UI = UI; // Expose
+
+        // Update helper to use path
+        UI.renderFileTree = (items, depth = 0) => {
+            let html = '';
+            items.forEach(item => {
+                const p = depth * 10;
+                const icon = item.type === 'folder' ? '📁' : '📄';
+                const cls = item.type === 'folder' ? 'ft-folder' : 'ft-file';
+
+                let clickAttr = '';
+                if (item.type === 'file') {
+                    // Use explicit path if available, else name (assumes root)
+                    const filePath = item.path || item.name;
+                    clickAttr = `onclick="window.openFile('${filePath}')" style="cursor:pointer; text-decoration:underline;"`;
+                }
+
+                html += `<div class="ft-item" style="padding-left:${p}px" ${clickAttr}><span class="${cls}">${icon}
+                ${item.name}</span></div>`;
+                if (item.children) html += UI.renderFileTree(item.children, depth + 1);
+            });
+            return html;
+        };
+
+        // Redefine openComponentPanel to use new render
+        UI.openComponentPanel = (node) => {
+            const p = document.getElementById('detail-panel');
+            const b = document.getElementById('panel-body');
+            document.getElementById('panel-title').innerText = 'COMPONENT DETAIL';
+            p.style.display = 'block';
+
+            const agent = State.agents.find(a => a.id === node.agentId);
+            const agentName = agent ? agent.name : 'Unassigned';
+
+            const subtasksHtml = node.subtasks.length > 0 ? node.subtasks.map(s => `
+        <div class="subtask-item">
+            <div style="font-weight:bold; color:#fff">${s.title}</div>
+            <div style="font-size:10px; color:#888; margin-top:2px;">${s.logic}</div>
+        </div>
+        `).join('') : '<div style="color:#666; font-style:italic">No subtasks</div>';
+
+            const fileTreeHtml = node.files.length > 0 ? `<div class="file-tree-container">${UI.renderFileTree(node.files)}
+        </div>` : '<div style="color:#666">No files</div>';
+
+            // Add Open Button if node itself represents a file (Level 2)
+            let openBtn = '';
+            // Heuristic: if label ends in .js or .csv, it's a file
+            if (node.label.includes('.') && !node.label.includes(' ')) {
+                const fPath = node.path || node.label;
+                openBtn = `<button class="btn-gen" style="background:var(--accent-warn); margin-bottom:10px;"
+            onclick="window.openFile('${fPath}')">Open ${node.label}</button>`;
+            }
+
+            b.innerHTML = `
+        <div class="prop-row"><span class="prop-label">Component</span><span class="prop-val">${node.label}</span></div>
+        <div class="prop-row"><span class="prop-label">Status</span><span class="prop-val"
+                style="color:${node.status === 'blocked' ? '#ff4444' : '#00ffcc'}">${node.status.toUpperCase()}</span>
+        </div>
+        <div class="prop-row"><span class="prop-label">Owner</span><span class="prop-val">${agentName}</span></div>
+
+        ${openBtn}
+
+        <div style="margin-top:15px; padding-top:10px; border-top:1px solid #333;">
+            <div class="prop-label" style="margin-bottom:5px; color:#fff">FILE STRUCTURE</div>
+            ${fileTreeHtml}
+        </div>
+
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid #333;">
+            <div class="prop-label" style="margin-bottom:5px; color:#fff">SUBTASKS</div>
+            <div class="subtask-list">${subtasksHtml}</div>
+        </div>
+
+        <button class="btn-gen" onclick="alert('Agent dispatched!')">✨ Auto-Generate Tasks</button>
+        `;
+        };
+        window.addEventListener('mousedown', (e) => {
+            if (!e.target.closest('.node') && !e.target.closest('#detail-panel') && !e.target.closest('.edge-label-group')) {
+                isGraphPanning = true;
+                panStart.x = e.clientX - State.graphPan.x;
+                panStart.y = e.clientY - State.graphPan.y;
+                document.getElementById('view-graph').style.cursor = 'grabbing';
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isGraphPanning) {
+                State.graphPan.x = e.clientX - panStart.x;
+                State.graphPan.y = e.clientY - panStart.y;
+                document.getElementById('view-graph').style.backgroundPosition = `${State.graphPan.x}px ${State.graphPan.y}px`;
+                UI.renderGraph();
+                return;
+            }
+
+            if (dragNodeId) {
+                const container = document.getElementById('view-graph').getBoundingClientRect();
+                let newX = (e.clientX - container.left - State.graphPan.x) - dragOffset.x;
+                let newY = (e.clientY - container.top - State.graphPan.y) - dragOffset.y;
+
+                const node = State.graphNodes.find(n => n.id === dragNodeId);
+                if (node) {
+                    node.x = newX;
+                    node.y = newY;
+                    UI.renderGraph();
+                }
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isGraphPanning = false;
+            dragNodeId = null;
+            document.getElementById('view-graph').style.cursor = 'grab';
+        });
+
+        // Start
+        UI.init();
+
+    </script>
+</body>
+
+</html>

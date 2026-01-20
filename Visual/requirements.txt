@@ -1,0 +1,10 @@
+# Agent Orchestrator Dependencies
+
+# Claude API client
+anthropic>=0.39.0
+
+# Environment variable loading (optional)
+python-dotenv>=1.0.0
+
+# Testing (optional, for development)
+pytest>=7.0.0
