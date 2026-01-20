@@ -103,16 +103,76 @@ KEY FUNCTIONS:
         }
 
         /* Mermaid Diagram */
+        .mermaid-wrapper {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
         #mermaid-container {
             flex: 1;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 6px;
             border: 1px solid var(--border-color);
-            overflow: auto;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+
+        #mermaid-container:active {
+            cursor: grabbing;
+        }
+
+        #mermaid-viewport {
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
             display: flex;
             align-items: center;
             justify-content: center;
+            min-height: 100%;
             padding: 20px;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .zoom-btn:hover {
+            background: var(--border-color);
+            border-color: var(--accent-color);
+        }
+
+        .zoom-level {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
         }
 
         header {
@@ -741,6 +801,7 @@ KEY FUNCTIONS:
             display: flex;
             overflow: hidden;
             min-height: 0; /* Important for flex children to scroll */
+            height: calc(100vh - 70px); /* Subtract header height */
         }
 
         /* Left Panel - Chat */
@@ -752,6 +813,7 @@ KEY FUNCTIONS:
             background: var(--panel-bg);
             overflow: hidden;
             min-height: 0;
+            height: 100%;
         }
 
         .chat-header {
@@ -921,13 +983,29 @@ KEY FUNCTIONS:
         /* Right Panel - Details */
         .panel-right {
             width: 55%;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
+            display: block;
+            overflow-y: scroll;
             overflow-x: hidden;
             background: #0a0c0f;
-            min-height: 0;
-            max-height: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .panel-right::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .panel-right::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .panel-right::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .panel-right::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-color);
         }
 
         .detail-hero {
@@ -1025,7 +1103,8 @@ KEY FUNCTIONS:
             gap: 1px;
             background: var(--border-light);
             padding: 1px;
-            padding-bottom: 50px; /* Extra space at bottom for scrolling */
+            padding-bottom: 100px; /* Extra space at bottom for scrolling */
+            margin-bottom: 20px;
         }
 
         .detail-section {
@@ -1969,9 +2048,230 @@ KEY FUNCTIONS:
             stroke-width: 2px;
         }
 
-        #mermaid-container svg {
-            max-width: 100%;
+        #mermaid-viewport svg {
+            max-width: none;
             height: auto;
+        }
+
+        /* Component Submenu Popover */
+        #component-submenu {
+            position: fixed;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            display: none;
+            min-width: 280px;
+            max-width: 350px;
+            overflow: hidden;
+        }
+
+        #component-submenu.visible {
+            display: block;
+            animation: submenuFadeIn 0.15s ease-out;
+        }
+
+        @keyframes submenuFadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .submenu-header {
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(0, 255, 204, 0.08) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .submenu-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0 0 4px 0;
+        }
+
+        .submenu-type {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .submenu-summary {
+            padding: 12px 15px;
+            font-size: 12px;
+            color: #aaa;
+            line-height: 1.5;
+            border-bottom: 1px solid var(--border-light);
+            max-height: 80px;
+            overflow: hidden;
+        }
+
+        .submenu-stats {
+            display: flex;
+            padding: 10px 15px;
+            gap: 15px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .submenu-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .submenu-stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .submenu-stat-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .submenu-actions {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .submenu-action {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: transparent;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .submenu-action:hover {
+            background: var(--border-color);
+            border-color: var(--accent-color);
+        }
+
+        .submenu-action.primary {
+            background: rgba(0, 255, 204, 0.1);
+            border-color: var(--accent-color);
+        }
+
+        .submenu-action.primary:hover {
+            background: rgba(0, 255, 204, 0.2);
+        }
+
+        .submenu-action-icon {
+            width: 16px;
+            text-align: center;
+            color: var(--accent-color);
+        }
+
+        .submenu-hint {
+            padding: 8px 15px;
+            font-size: 10px;
+            color: #555;
+            text-align: center;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .submenu-problem {
+            padding: 10px 15px;
+            font-size: 11px;
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.08);
+            border-left: 2px solid #ff6b6b;
+            margin: 0;
+            display: none;
+        }
+
+        .submenu-problem.visible {
+            display: block;
+        }
+
+        .submenu-goals {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-light);
+            display: none;
+        }
+
+        .submenu-goals.visible {
+            display: block;
+        }
+
+        .submenu-goals-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .submenu-goal-item {
+            font-size: 11px;
+            color: #aaa;
+            padding: 3px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .submenu-goal-item::before {
+            content: '◎';
+            color: var(--accent-color);
+            font-size: 8px;
+            margin-top: 2px;
+        }
+
+        .submenu-io {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-light);
+            display: none;
+        }
+
+        .submenu-io.visible {
+            display: block;
+        }
+
+        .submenu-io-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .submenu-io-col {
+            flex: 1;
+        }
+
+        .submenu-io-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .submenu-io-item {
+            font-size: 10px;
+            color: #888;
+            padding: 2px 0;
+        }
+
+        .submenu-io-item.input::before {
+            content: '← ';
+            color: var(--accent-color);
+        }
+
+        .submenu-io-item.output::before {
+            content: '→ ';
+            color: var(--accent-success);
         }
     </style>
     <script type="module">
@@ -1989,11 +2289,12 @@ KEY FUNCTIONS:
 
         window.drawMermaid = async function (graphDefinition) {
             console.log('[Mermaid] drawMermaid called with:', graphDefinition?.substring(0, 100));
-            const element = document.getElementById('mermaid-container');
+            const viewport = document.getElementById('mermaid-viewport');
+            const container = document.getElementById('mermaid-container');
 
             if (!graphDefinition) {
                 console.log('[Mermaid] No graph definition provided');
-                element.innerHTML = '<p style="color:#666">No design generated yet</p>';
+                viewport.innerHTML = '<p style="color:#666">No design generated yet</p>';
                 return;
             }
 
@@ -2016,15 +2317,15 @@ KEY FUNCTIONS:
             const renderId = ++mermaidRenderCounter;
 
             try {
-                // Clear previous content
-                element.innerHTML = '';
+                // Clear previous content but keep viewport structure
+                viewport.innerHTML = '';
 
                 // Create a new div with unique ID for this render
                 const diagramDiv = document.createElement('div');
                 diagramDiv.className = 'mermaid';
                 diagramDiv.id = 'mermaid-diagram-' + renderId;
                 diagramDiv.textContent = graphDefinition;
-                element.appendChild(diagramDiv);
+                viewport.appendChild(diagramDiv);
 
                 console.log('[Mermaid] Running mermaid.run (render #' + renderId + ')...');
                 await mermaid.run({
@@ -2038,7 +2339,7 @@ KEY FUNCTIONS:
             } catch (error) {
                 console.error('[Mermaid] Render error:', error);
                 // Show error but also the raw code for debugging
-                element.innerHTML = '<div style="padding: 10px;">' +
+                viewport.innerHTML = '<div style="padding: 10px;">' +
                     '<p style="color:#e74c3c; margin-bottom: 10px;">Diagram render error: ' + error.message + '</p>' +
                     '<details style="color:#666; font-size: 10px;">' +
                     '<summary style="cursor:pointer;">Show raw diagram code</summary>' +
@@ -2206,9 +2507,18 @@ KEY FUNCTIONS:
                     <span id="nodeCount">0</span> components
                 </div>
             </div>
-            <div id="mermaid-container">
-                <p style="color: #444; font-size: 12px; font-family: var(--font-mono);">Diagram will appear after
-                    analysis...</p>
+            <div class="mermaid-wrapper">
+                <div id="mermaid-container">
+                    <div id="mermaid-viewport">
+                        <p style="color: #444; font-size: 12px; font-family: var(--font-mono);">Diagram will appear after analysis...</p>
+                    </div>
+                </div>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="zoomGraph(-0.2)" title="Zoom Out">−</button>
+                    <span class="zoom-level" id="zoom-level">100%</span>
+                    <button class="zoom-btn" onclick="zoomGraph(0.2)" title="Zoom In">+</button>
+                    <button class="zoom-btn" onclick="resetGraphView()" title="Reset View">⟲</button>
+                </div>
             </div>
         </div>
     </div>
@@ -2224,6 +2534,49 @@ KEY FUNCTIONS:
                 <p style="color: #555; font-size: 12px;">Loading projects...</p>
             </div>
         </div>
+    </div>
+
+    <!-- Component Submenu Popover -->
+    <div id="component-submenu">
+        <div class="submenu-header">
+            <div class="submenu-title" id="submenu-title">Component Name</div>
+            <div class="submenu-type" id="submenu-type">Node</div>
+        </div>
+        <div class="submenu-summary" id="submenu-summary">
+            Component summary will appear here...
+        </div>
+        <div class="submenu-problem" id="submenu-problem"></div>
+        <div class="submenu-goals" id="submenu-goals"></div>
+        <div class="submenu-stats">
+            <div class="submenu-stat">
+                <span class="submenu-stat-value" id="submenu-reqs">0</span>
+                <span class="submenu-stat-label">Requirements</span>
+            </div>
+            <div class="submenu-stat">
+                <span class="submenu-stat-value" id="submenu-risks">0</span>
+                <span class="submenu-stat-label">Risks</span>
+            </div>
+            <div class="submenu-stat">
+                <span class="submenu-stat-value" id="submenu-tests">0</span>
+                <span class="submenu-stat-label">Tests</span>
+            </div>
+            <div class="submenu-stat">
+                <span class="submenu-stat-value" id="submenu-goals-count">0</span>
+                <span class="submenu-stat-label">Goals</span>
+            </div>
+        </div>
+        <div class="submenu-io" id="submenu-io"></div>
+        <div class="submenu-actions">
+            <button class="submenu-action primary" onclick="openComponentFromSubmenu()">
+                <span class="submenu-action-icon">→</span>
+                View Full Details
+            </button>
+            <button class="submenu-action" onclick="askAIAboutComponent()">
+                <span class="submenu-action-icon">?</span>
+                Ask AI About This
+            </button>
+        </div>
+        <div class="submenu-hint">Double-click component to open full view</div>
     </div>
 
     <!-- Component Detail Panel - Full Screen Two-Column -->
@@ -2573,6 +2926,89 @@ KEY FUNCTIONS:
             return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
+        // Graph Zoom and Pan
+        let graphZoom = 1;
+        let graphPanX = 0;
+        let graphPanY = 0;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+
+        function updateGraphTransform() {
+            const viewport = document.getElementById('mermaid-viewport');
+            if (viewport) {
+                viewport.style.transform = `translate(${graphPanX}px, ${graphPanY}px) scale(${graphZoom})`;
+                document.getElementById('zoom-level').textContent = Math.round(graphZoom * 100) + '%';
+            }
+        }
+
+        function zoomGraph(delta) {
+            graphZoom = Math.max(0.25, Math.min(3, graphZoom + delta));
+            updateGraphTransform();
+        }
+
+        function resetGraphView() {
+            graphZoom = 1;
+            graphPanX = 0;
+            graphPanY = 0;
+            updateGraphTransform();
+        }
+
+        // Initialize pan/zoom on mermaid container
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('mermaid-container');
+            if (!container) return;
+
+            // Mouse wheel zoom
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                graphZoom = Math.max(0.25, Math.min(3, graphZoom + delta));
+                updateGraphTransform();
+            }, { passive: false });
+
+            // Pan with mouse drag
+            container.addEventListener('mousedown', (e) => {
+                if (e.target.closest('g.node')) return; // Don't pan when clicking nodes
+                isPanning = true;
+                panStartX = e.clientX - graphPanX;
+                panStartY = e.clientY - graphPanY;
+                container.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+                graphPanX = e.clientX - panStartX;
+                graphPanY = e.clientY - panStartY;
+                updateGraphTransform();
+            });
+
+            document.addEventListener('mouseup', () => {
+                isPanning = false;
+                const container = document.getElementById('mermaid-container');
+                if (container) container.style.cursor = 'grab';
+            });
+
+            // Touch support for mobile
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    touchStartX = e.touches[0].clientX - graphPanX;
+                    touchStartY = e.touches[0].clientY - graphPanY;
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1) {
+                    graphPanX = e.touches[0].clientX - touchStartX;
+                    graphPanY = e.touches[0].clientY - touchStartY;
+                    updateGraphTransform();
+                }
+            }, { passive: true });
+        });
+
         function formatDate(dateStr) {
             if (!dateStr) return '';
             const date = new Date(dateStr);
@@ -2638,6 +3074,138 @@ KEY FUNCTIONS:
                 lastEntry.querySelector('.log-message').textContent = message;
             }
         }
+
+        // Component Submenu Functions
+        let submenuComponentId = null;
+
+        function showComponentSubmenu(componentId, x, y) {
+            const comp = (currentBrief?.components || []).find(c => c.id === componentId);
+            if (!comp) return;
+
+            submenuComponentId = componentId;
+            const submenu = document.getElementById('component-submenu');
+
+            // Populate basic info
+            document.getElementById('submenu-title').textContent = comp.label || 'Component';
+            document.getElementById('submenu-type').textContent = comp.type || 'Node';
+            document.getElementById('submenu-summary').textContent = comp.summary || 'No summary available';
+            document.getElementById('submenu-reqs').textContent = (comp.requirements || []).length;
+            document.getElementById('submenu-risks').textContent = (comp.risks || []).length;
+            document.getElementById('submenu-tests').textContent = (comp.testCases || []).length;
+            document.getElementById('submenu-goals-count').textContent = (comp.goals || []).length;
+
+            // Populate problem statement
+            const problemEl = document.getElementById('submenu-problem');
+            if (comp.problem) {
+                problemEl.textContent = comp.problem.substring(0, 150) + (comp.problem.length > 150 ? '...' : '');
+                problemEl.classList.add('visible');
+            } else {
+                problemEl.classList.remove('visible');
+            }
+
+            // Populate goals (show first 3)
+            const goalsEl = document.getElementById('submenu-goals');
+            const goals = comp.goals || [];
+            if (goals.length > 0) {
+                goalsEl.innerHTML = '<div class="submenu-goals-label">Goals</div>' +
+                    goals.slice(0, 3).map(g => '<div class="submenu-goal-item">' + escapeHtml(g.substring(0, 60)) + '</div>').join('') +
+                    (goals.length > 3 ? '<div style="font-size:10px;color:#555;">+' + (goals.length - 3) + ' more...</div>' : '');
+                goalsEl.classList.add('visible');
+            } else {
+                goalsEl.classList.remove('visible');
+            }
+
+            // Populate inputs/outputs
+            const ioEl = document.getElementById('submenu-io');
+            const inputs = comp.inputs || [];
+            const outputs = comp.outputs || [];
+            if (inputs.length > 0 || outputs.length > 0) {
+                ioEl.innerHTML = '<div class="submenu-io-row">' +
+                    '<div class="submenu-io-col">' +
+                    '<div class="submenu-io-label">Inputs</div>' +
+                    (inputs.length > 0 ? inputs.slice(0, 3).map(i => '<div class="submenu-io-item input">' + escapeHtml(i.substring(0, 25)) + '</div>').join('') : '<div class="submenu-io-item" style="color:#444">None</div>') +
+                    '</div>' +
+                    '<div class="submenu-io-col">' +
+                    '<div class="submenu-io-label">Outputs</div>' +
+                    (outputs.length > 0 ? outputs.slice(0, 3).map(o => '<div class="submenu-io-item output">' + escapeHtml(o.substring(0, 25)) + '</div>').join('') : '<div class="submenu-io-item" style="color:#444">None</div>') +
+                    '</div>' +
+                    '</div>';
+                ioEl.classList.add('visible');
+            } else {
+                ioEl.classList.remove('visible');
+            }
+
+            // Position the submenu
+            const menuWidth = 320;
+            const menuHeight = 450;
+            const padding = 10;
+
+            // Adjust position to stay within viewport
+            let posX = x + padding;
+            let posY = y + padding;
+
+            if (posX + menuWidth > window.innerWidth) {
+                posX = x - menuWidth - padding;
+            }
+            if (posY + menuHeight > window.innerHeight) {
+                posY = window.innerHeight - menuHeight - padding;
+            }
+            if (posX < padding) posX = padding;
+            if (posY < padding) posY = padding;
+
+            submenu.style.left = posX + 'px';
+            submenu.style.top = posY + 'px';
+            submenu.classList.add('visible');
+        }
+
+        function hideComponentSubmenu() {
+            const submenu = document.getElementById('component-submenu');
+            submenu.classList.remove('visible');
+            submenuComponentId = null;
+        }
+
+        function openComponentFromSubmenu() {
+            if (submenuComponentId) {
+                hideComponentSubmenu();
+                openComponentDetail(submenuComponentId);
+            }
+        }
+
+        function askAIAboutComponent() {
+            if (submenuComponentId) {
+                const comp = (currentBrief?.components || []).find(c => c.id === submenuComponentId);
+                if (comp) {
+                    hideComponentSubmenu();
+                    openComponentDetail(submenuComponentId);
+                    // Wait for panel to open, then send a message
+                    setTimeout(() => {
+                        sendChatMessage('Give me a detailed explanation of this component and what it needs to accomplish');
+                    }, 300);
+                }
+            }
+        }
+
+        // Close submenu when clicking outside
+        document.addEventListener('click', (e) => {
+            const submenu = document.getElementById('component-submenu');
+            if (submenu && submenu.classList.contains('visible')) {
+                if (!e.target.closest('#component-submenu') &&
+                    !e.target.closest('#mermaid-container svg g.node') &&
+                    !e.target.closest('.component-tag')) {
+                    hideComponentSubmenu();
+                }
+            }
+        });
+
+        // Close submenu on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const submenu = document.getElementById('component-submenu');
+                if (submenu && submenu.classList.contains('visible')) {
+                    hideComponentSubmenu();
+                }
+            }
+        });
 
         // Component Detail Panel Functions - Full Screen Two-Column
         let chatHistory = [];
@@ -3618,7 +4186,22 @@ KEY FUNCTIONS:
             tag.className = 'component-tag' + (comp.type === 'root' ? ' root' : '');
             tag.textContent = comp.label;
             tag.dataset.id = comp.id;
-            tag.onclick = () => openComponentDetail(comp.id);
+
+            // Single click - show submenu
+            tag.onclick = (e) => {
+                e.stopPropagation();
+                const rect = tag.getBoundingClientRect();
+                showComponentSubmenu(comp.id, rect.right, rect.top);
+            };
+
+            // Double click - open full detail panel
+            tag.ondblclick = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                hideComponentSubmenu();
+                openComponentDetail(comp.id);
+            };
+
             if (selectedComponentId === comp.id) {
                 tag.classList.add('selected');
             }
@@ -3660,10 +4243,23 @@ KEY FUNCTIONS:
                     });
                 };
 
+                // Single click - show submenu
                 node.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const comp = findComponent();
                     if (comp) {
+                        showComponentSubmenu(comp.id, e.clientX, e.clientY);
+                        highlightDiagramNode(node, svg);
+                    }
+                });
+
+                // Double click - open full detail panel
+                node.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const comp = findComponent();
+                    if (comp) {
+                        hideComponentSubmenu();
                         openComponentDetail(comp.id);
                         highlightDiagramNode(node, svg);
                     }
@@ -4217,8 +4813,14 @@ KEY FUNCTIONS:
             closeDetailPanel();
 
             // Clear diagram and reset count
-            document.getElementById('mermaid-container').innerHTML = '<p style="color: #444; font-size: 12px; font-family: var(--font-mono);">Diagram will appear after analysis...</p>';
+            const viewport = document.getElementById('mermaid-viewport');
+            if (viewport) {
+                viewport.innerHTML = '<p style="color: #444; font-size: 12px; font-family: var(--font-mono);">Diagram will appear after analysis...</p>';
+            }
             document.getElementById('nodeCount').textContent = '0';
+
+            // Reset zoom/pan
+            resetGraphView();
         }
 
         function showStatus(elementId, type, message) {
