@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GM Dashboard - Build Planning</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-orange: #db6d28;
+            --accent-red: #f85149;
+            --accent-purple: #a371f7;
+            --accent-cyan: #39c5cf;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .project-name {
+            color: var(--accent-blue);
+            font-weight: 500;
+        }
+
+        .phase-badge {
+            background: var(--accent-purple);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-tertiary);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .view-btn.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: flex;
+            height: calc(100vh - 57px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .component-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .component-item {
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .component-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .component-item.selected {
+            background: var(--bg-tertiary);
+            border-left-color: var(--accent-blue);
+        }
+
+        .component-item.root { border-left-color: var(--accent-purple); }
+        .component-item.service { border-left-color: var(--accent-blue); }
+        .component-item.api { border-left-color: var(--accent-cyan); }
+        .component-item.data { border-left-color: var(--accent-yellow); }
+        .component-item.ui { border-left-color: #ec4899; }
+        .component-item.security { border-left-color: var(--accent-red); }
+        .component-item.utility { border-left-color: var(--text-secondary); }
+        .component-item.integration { border-left-color: var(--accent-green); }
+
+        .component-label {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .component-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .component-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* View Panels */
+        .view-panel {
+            display: none;
+            flex: 1;
+            overflow: auto;
+        }
+
+        .view-panel.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Architecture View */
+        #architectureView {
+            padding: 20px;
+        }
+
+        .diagram-container {
+            flex: 1;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        .diagram-container svg {
+            max-width: 100%;
+        }
+
+        /* Files View */
+        #filesView {
+            padding: 20px;
+        }
+
+        .files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .files-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .files-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .files-stats span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-number {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        /* File Tree */
+        .file-tree {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .file-group {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .file-group:last-child {
+            border-bottom: none;
+        }
+
+        .file-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .file-group-header:hover {
+            background: var(--border-color);
+        }
+
+        .file-group-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .file-group-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .file-group-count {
+            background: var(--bg-primary);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .file-group-content {
+            display: none;
+            padding: 8px;
+        }
+
+        .file-group.expanded .file-group-content {
+            display: block;
+        }
+
+        .file-group.expanded .file-group-header {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .file-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            background: var(--bg-primary);
+            gap: 12px;
+        }
+
+        .file-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .file-icon {
+            font-size: 16px;
+            margin-top: 2px;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-path {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 13px;
+            color: var(--accent-blue);
+            margin-bottom: 4px;
+        }
+
+        .file-purpose {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .file-exports {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .export-tag {
+            background: var(--bg-tertiary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            color: var(--accent-green);
+        }
+
+        .file-priority {
+            background: var(--bg-tertiary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .file-priority.high {
+            color: var(--accent-red);
+        }
+
+        /* Component Detail View */
+        #componentView {
+            padding: 20px;
+        }
+
+        .component-detail-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .component-detail-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .component-type-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .component-type-badge.service { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .component-type-badge.api { background: rgba(57, 197, 207, 0.2); color: var(--accent-cyan); }
+        .component-type-badge.data { background: rgba(210, 153, 34, 0.2); color: var(--accent-yellow); }
+        .component-type-badge.ui { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+        .component-type-badge.security { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+
+        .detail-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .detail-section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .detail-section.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .detail-section-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-section-content {
+            padding: 16px;
+        }
+
+        /* Steps List */
+        .steps-list {
+            list-style: none;
+        }
+
+        .step-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .step-item:last-child {
+            border-bottom: none;
+        }
+
+        .step-number {
+            width: 28px;
+            height: 28px;
+            background: var(--accent-blue);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-description {
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .step-file {
+            font-size: 12px;
+            color: var(--accent-cyan);
+            font-family: monospace;
+        }
+
+        /* Tests List */
+        .test-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .test-item:last-child {
+            border-bottom: none;
+        }
+
+        .test-icon {
+            color: var(--accent-green);
+        }
+
+        .test-name {
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        /* Execution Order */
+        .execution-order {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .execution-order-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .execution-phases {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .execution-phase {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+
+        .phase-number {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-purple);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .phase-components {
+            font-size: 13px;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-muted);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <span class="header-title">GM Dashboard</span>
+            <span class="project-name" id="projectName">Loading...</span>
+            <span class="phase-badge" id="phaseBadge">Planning</span>
+        </div>
+        <div class="view-toggle">
+            <button class="view-btn active" data-view="architecture">Components</button>
+            <button class="view-btn" data-view="files">All Files</button>
+            <button class="view-btn" data-view="component">Component Detail</button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">Components</div>
+            <div class="component-list" id="componentList">
+                <div class="loading">Loading components...</div>
+            </div>
+        </aside>
+
+        <!-- Content -->
+        <main class="content">
+            <!-- Architecture View -->
+            <div class="view-panel active" id="architectureView">
+                <div id="executionOrder" style="padding: 20px 20px 0 20px;"></div>
+                <div style="padding: 0 20px 20px 20px; flex: 1; display: flex; flex-direction: column;">
+                    <div class="diagram-container" id="mermaidViewport">
+                        <div class="loading">Loading diagram...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files View -->
+            <div class="view-panel" id="filesView">
+                <div class="files-header">
+                    <span class="files-title">Project Files</span>
+                    <div class="files-stats">
+                        <span><span class="stat-number" id="totalFiles">0</span> files</span>
+                        <span><span class="stat-number" id="totalLines">0</span> estimated lines</span>
+                        <span><span class="stat-number" id="totalComponents">0</span> components</span>
+                    </div>
+                </div>
+                <div class="file-tree" id="fileTree">
+                    <div class="loading">Loading files...</div>
+                </div>
+            </div>
+
+            <!-- Component Detail View -->
+            <div class="view-panel" id="componentView">
+                <div class="empty-state" id="componentEmpty">
+                    <h3>No Component Selected</h3>
+                    <p>Select a component from the sidebar to view its build plan</p>
+                </div>
+                <div id="componentDetail" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        // State
+        let projectData = null;
+        let workPlan = null;
+        let selectedComponentId = null;
+
+        // Get project ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectId = urlParams.get('project');
+
+        // View switching
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById(btn.dataset.view + 'View').classList.add('active');
+            };
+        });
+
+        // Load data
+        async function loadData() {
+            if (!projectId) {
+                document.getElementById('projectName').textContent = 'No project selected';
+                return;
+            }
+
+            try {
+                // Load project data
+                const projectResponse = await fetch(`/api/project/${projectId}`);
+                projectData = await projectResponse.json();
+
+                document.getElementById('projectName').textContent = projectData.projectName || 'Unnamed Project';
+                document.getElementById('phaseBadge').textContent = projectData.phase || 'Planning';
+
+                // Load work plan
+                const workPlanResponse = await fetch(`/api/projects/${projectId}/work-plan`);
+                const wpData = await workPlanResponse.json();
+                workPlan = wpData.work_plan;
+
+                // Render views
+                renderComponentList();
+                renderDiagram();
+                renderExecutionOrder();
+                renderFilesView();
+
+            } catch (err) {
+                console.error('Failed to load data:', err);
+                document.getElementById('projectName').textContent = 'Error loading project';
+            }
+        }
+
+        // Render component list
+        function renderComponentList() {
+            const list = document.getElementById('componentList');
+            const components = projectData?.nodes || [];
+
+            if (components.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>No components found</p></div>';
+                return;
+            }
+
+            list.innerHTML = components.map(comp => {
+                const subtasks = comp.subtasks || [];
+                const fileCount = subtasks.filter(t => t.type === 'file').length;
+                const stepCount = subtasks.filter(t => t.type === 'step').length;
+
+                return `
+                    <div class="component-item ${comp.type || ''}" data-id="${comp.id}" onclick="selectComponent('${comp.id}')">
+                        <div class="component-label">${comp.label}</div>
+                        <div class="component-meta">
+                            <span>${comp.type || 'node'}</span>
+                            <span>${fileCount} files</span>
+                            <span>${stepCount} steps</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Select component
+        function selectComponent(compId) {
+            selectedComponentId = compId;
+
+            // Update selection in list
+            document.querySelectorAll('.component-item').forEach(el => {
+                el.classList.toggle('selected', el.dataset.id === compId);
+            });
+
+            // Show component detail
+            renderComponentDetail();
+
+            // Switch to component view
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('[data-view="component"]').classList.add('active');
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('componentView').classList.add('active');
+        }
+
+        // Render component detail
+        function renderComponentDetail() {
+            const comp = (projectData?.nodes || []).find(c => c.id === selectedComponentId);
+
+            if (!comp) {
+                document.getElementById('componentEmpty').style.display = 'flex';
+                document.getElementById('componentDetail').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('componentEmpty').style.display = 'none';
+            document.getElementById('componentDetail').style.display = 'block';
+
+            const subtasks = comp.subtasks || [];
+            const files = subtasks.filter(t => t.type === 'file');
+            const steps = subtasks.filter(t => t.type === 'step');
+            const tests = subtasks.filter(t => t.type === 'test');
+
+            document.getElementById('componentDetail').innerHTML = `
+                <div class="component-detail-header">
+                    <span class="component-detail-title">${comp.label}</span>
+                    <span class="component-type-badge ${comp.type || ''}">${comp.type || 'node'}</span>
+                </div>
+
+                <div class="detail-sections">
+                    <!-- Files Section -->
+                    <div class="detail-section full-width">
+                        <div class="detail-section-header">
+                            <span>Files to Create (${files.length})</span>
+                        </div>
+                        <div class="detail-section-content">
+                            ${files.length > 0 ? files.map(f => `
+                                <div class="file-item">
+                                    <span class="file-icon">📄</span>
+                                    <div class="file-info">
+                                        <div class="file-path">${f.path || 'Unknown path'}</div>
+                                        <div class="file-purpose">${f.purpose || ''}</div>
+                                        ${f.dependencies?.length ? `
+                                            <div class="file-exports">
+                                                ${f.dependencies.map(d => `<span class="export-tag">← ${d}</span>`).join('')}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('') : '<div class="empty-state"><p>No files defined yet</p></div>'}
+                        </div>
+                    </div>
+
+                    <!-- Steps Section -->
+                    <div class="detail-section">
+                        <div class="detail-section-header">
+                            <span>Implementation Steps (${steps.length})</span>
+                        </div>
+                        <div class="detail-section-content">
+                            ${steps.length > 0 ? `
+                                <ul class="steps-list">
+                                    ${steps.sort((a, b) => (a.order || 0) - (b.order || 0)).map(s => `
+                                        <li class="step-item">
+                                            <span class="step-number">${s.order || '?'}</span>
+                                            <div class="step-content">
+                                                <div class="step-description">${s.description || 'No description'}</div>
+                                            </div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            ` : '<div class="empty-state"><p>No steps defined yet</p></div>'}
+                        </div>
+                    </div>
+
+                    <!-- Tests Section -->
+                    <div class="detail-section">
+                        <div class="detail-section-header">
+                            <span>Tests (${tests.length})</span>
+                        </div>
+                        <div class="detail-section-content">
+                            ${tests.length > 0 ? tests.map(t => `
+                                <div class="test-item">
+                                    <span class="test-icon">🧪</span>
+                                    <span class="test-name">${t.name || 'Unnamed test'}</span>
+                                </div>
+                            `).join('') : '<div class="empty-state"><p>No tests defined yet</p></div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render execution order
+        function renderExecutionOrder() {
+            const container = document.getElementById('executionOrder');
+
+            if (!workPlan || !workPlan.execution_order || workPlan.execution_order.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="execution-order">
+                    <div class="execution-order-title">Build Order</div>
+                    <div class="execution-phases">
+                        ${workPlan.execution_order.map((item, i) => `
+                            <div class="execution-phase">
+                                <span class="phase-number">${i + 1}</span>
+                                <span class="phase-components">${item.label}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render files view
+        function renderFilesView() {
+            const container = document.getElementById('fileTree');
+            const components = (projectData?.nodes || []).filter(c => c.type !== 'root');
+
+            let totalFiles = 0;
+            let totalLines = 0;
+
+            // Build file groups by component
+            const groups = components.map(comp => {
+                const subtasks = comp.subtasks || [];
+                const files = subtasks.filter(t => t.type === 'file');
+                totalFiles += files.length;
+                files.forEach(f => {
+                    totalLines += f.estimated_lines || 50;
+                });
+
+                return { comp, files };
+            }).filter(g => g.files.length > 0);
+
+            // Update stats
+            document.getElementById('totalFiles').textContent = totalFiles;
+            document.getElementById('totalLines').textContent = totalLines;
+            document.getElementById('totalComponents').textContent = components.length;
+
+            if (groups.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No Build Plans Yet</h3>
+                        <p>Run the GM phase to generate file-by-file build plans</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = groups.map(({ comp, files }) => `
+                <div class="file-group expanded">
+                    <div class="file-group-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <div class="file-group-title">
+                            <span class="file-group-icon" style="background: ${getTypeColor(comp.type)}"></span>
+                            <span>${comp.label}</span>
+                        </div>
+                        <span class="file-group-count">${files.length} files</span>
+                    </div>
+                    <div class="file-group-content">
+                        ${files.map(f => `
+                            <div class="file-item">
+                                <span class="file-icon">${getFileIcon(f.path)}</span>
+                                <div class="file-info">
+                                    <div class="file-path">${f.path || 'Unknown'}</div>
+                                    <div class="file-purpose">${f.purpose || ''}</div>
+                                    ${f.exports?.length ? `
+                                        <div class="file-exports">
+                                            ${f.exports.map(e => `<span class="export-tag">${e}</span>`).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <span class="file-priority ${f.priority === 1 ? 'high' : ''}">P${f.priority || '?'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render diagram
+        async function renderDiagram() {
+            const viewport = document.getElementById('mermaidViewport');
+            const components = projectData?.nodes || [];
+            const edges = projectData?.edges || [];
+
+            if (components.length === 0) {
+                viewport.innerHTML = '<div class="empty-state"><h3>No Components</h3><p>No architecture to display</p></div>';
+                return;
+            }
+
+            // Generate Mermaid code
+            let code = 'flowchart TD\n';
+
+            components.forEach(comp => {
+                const label = comp.label.replace(/"/g, "'");
+                code += `    ${comp.id}["${label}"]\n`;
+            });
+
+            edges.forEach(edge => {
+                const label = edge.label ? `|${edge.label}|` : '';
+                code += `    ${edge.from} -->${label} ${edge.to}\n`;
+            });
+
+            try {
+                const { svg } = await mermaid.render('gm-diagram', code);
+                viewport.innerHTML = svg;
+
+                // Make nodes clickable
+                setTimeout(() => {
+                    document.querySelectorAll('#mermaidViewport svg g.node').forEach(node => {
+                        node.style.cursor = 'pointer';
+                        node.onclick = (e) => {
+                            e.stopPropagation();
+                            const nodeId = node.id?.replace('flowchart-', '').split('-')[0];
+                            if (nodeId) selectComponent(nodeId);
+                        };
+                    });
+                }, 100);
+            } catch (err) {
+                console.error('Mermaid error:', err);
+                viewport.innerHTML = '<div class="empty-state"><h3>Diagram Error</h3><p>Could not render diagram</p></div>';
+            }
+        }
+
+        // Helper functions
+        function getTypeColor(type) {
+            const colors = {
+                'root': '#a371f7',
+                'service': '#58a6ff',
+                'api': '#39c5cf',
+                'data': '#d29922',
+                'ui': '#ec4899',
+                'security': '#f85149',
+                'utility': '#8b949e',
+                'integration': '#3fb950'
+            };
+            return colors[type] || colors['service'];
+        }
+
+        function getFileIcon(path) {
+            if (!path) return '📄';
+            if (path.includes('test')) return '🧪';
+            if (path.endsWith('.py')) return '🐍';
+            if (path.endsWith('.js') || path.endsWith('.ts')) return '📜';
+            if (path.endsWith('.html')) return '🌐';
+            if (path.endsWith('.css')) return '🎨';
+            if (path.endsWith('.json')) return '📋';
+            return '📄';
+        }
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

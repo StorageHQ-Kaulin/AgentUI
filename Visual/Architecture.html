@@ -3212,10 +3212,14 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                 const data = await gmResponse.json();
 
                 if (data.status === 'success') {
-                    alert(`GM Phase Complete!\n\nCreated build plans for ${data.work_plan.total_components} components.\n\nExecution order:\n${data.work_plan.execution_order.map((o, i) => `${i+1}. ${o.label}`).join('\n')}`);
+                    const goToGM = confirm(`GM Phase Complete!\n\nCreated build plans for ${data.work_plan.total_components} components.\n\nExecution order:\n${data.work_plan.execution_order.map((o, i) => `${i+1}. ${o.label}`).join('\n')}\n\nGo to GM Dashboard to view details?`);
 
-                    // Reload to show updated component data
-                    loadArchitecture(projectId);
+                    if (goToGM) {
+                        window.location.href = `GM.html?project=${projectId}`;
+                    } else {
+                        // Reload to show updated component data
+                        loadArchitecture(projectId);
+                    }
                 } else {
                     throw new Error(data.message || 'GM phase failed');
                 }
