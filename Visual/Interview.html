@@ -3185,18 +3185,20 @@ KEY FUNCTIONS:
         }
 
         function openComponentFromSubmenu() {
-            if (submenuComponentId) {
+            const compId = submenuComponentId; // Save before hiding clears it
+            if (compId) {
                 hideComponentSubmenu();
-                openComponentDetail(submenuComponentId);
+                openComponentDetail(compId);
             }
         }
 
         function askAIAboutComponent() {
-            if (submenuComponentId) {
-                const comp = (currentBrief?.components || []).find(c => c.id === submenuComponentId);
+            const compId = submenuComponentId; // Save before hiding clears it
+            if (compId) {
+                const comp = (currentBrief?.components || []).find(c => c.id === compId);
                 if (comp) {
                     hideComponentSubmenu();
-                    openComponentDetail(submenuComponentId);
+                    openComponentDetail(compId);
                     // Wait for panel to open, then send a message
                     setTimeout(() => {
                         sendChatMessage('Give me a detailed explanation of this component and what it needs to accomplish');
