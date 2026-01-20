@@ -2372,7 +2372,13 @@ KEY FUNCTIONS:
         mermaid.initialize({
             startOnLoad: false,
             theme: 'dark',
-            securityLevel: 'loose'
+            securityLevel: 'loose',
+            flowchart: {
+                nodeSpacing: 80,
+                rankSpacing: 100,
+                curve: 'basis',
+                padding: 20
+            }
         });
 
         // Debounce and render state management
@@ -2983,10 +2989,7 @@ KEY FUNCTIONS:
                 if (!label) return 'Component';
                 return String(label)
                     .replace(/"/g, "'")
-                    .replace(/\[/g, '(')
-                    .replace(/\]/g, ')')
-                    .replace(/[<>{}|#&;]/g, '')
-                    .replace(/\\/g, '')
+                    .replace(/[<>{}|#&;\[\]()\/\\]/g, '')
                     .replace(/\n/g, ' ')
                     .trim()
                     .substring(0, 50) || 'Component';
@@ -3015,12 +3018,12 @@ KEY FUNCTIONS:
 
                 // Only add edge if both nodes exist in our map
                 if (fromId && toId && validIds.has(fromId) && validIds.has(toId)) {
-                    // Generate edge label - sanitize it
+                    // Generate edge label - sanitize it (remove Mermaid special chars)
                     var edgeLabel = '';
                     if (edge.label) {
                         var cleanLabel = String(edge.label)
                             .replace(/["'|]/g, '')
-                            .replace(/[<>{}#&;\\]/g, '')
+                            .replace(/[<>{}#&;\\()\/\[\]]/g, '')
                             .substring(0, 25)
                             .trim();
                         if (cleanLabel) {
