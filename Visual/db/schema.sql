@@ -150,6 +150,19 @@ CREATE TABLE IF NOT EXISTS global_tasks (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- Chat History table (for component/PRD chat conversations)
+CREATE TABLE IF NOT EXISTS chat_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL,
+    component_id TEXT,
+    role TEXT NOT NULL,           -- 'user' or 'assistant'
+    content TEXT NOT NULL,
+    section TEXT,                 -- PRD section context (overview, scope, etc.)
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_components_project ON components(project_id);
 CREATE INDEX IF NOT EXISTS idx_components_parent ON components(parent_id);
@@ -167,6 +180,8 @@ CREATE INDEX IF NOT EXISTS idx_metrics_component ON metrics(component_id);
 CREATE INDEX IF NOT EXISTS idx_test_cases_component ON test_cases(component_id);
 CREATE INDEX IF NOT EXISTS idx_managers_project ON managers(project_id);
 CREATE INDEX IF NOT EXISTS idx_agents_manager ON agents(manager_id);
+CREATE INDEX IF NOT EXISTS idx_chat_history_project ON chat_history(project_id);
+CREATE INDEX IF NOT EXISTS idx_chat_history_component ON chat_history(component_id);
 
 -- Trigger to update updated_at on projects
 CREATE TRIGGER IF NOT EXISTS update_project_timestamp

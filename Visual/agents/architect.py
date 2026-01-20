@@ -115,16 +115,10 @@ class ArchitectAgent(BaseAgent):
         if not self.db:
             return
 
-        # 1. Clear existing design for this project (for now, simplistic overwrite)
-        # In a real system, we might version this or diff it.
-        # self.db.execute("DELETE FROM components WHERE project_id = ?", (project_id,))
-        # self.db.execute("DELETE FROM edges WHERE project_id = ?", (project_id,))
-        # For MVP, we'll assume we are adding to it or the DB handles upsert.
-        # Let's clean slate for this iteration to avoid ghosts.
-        
-        # Actually, let's look at db.create_component implementation. 
-        # It takes individual args. We need to iterate.
-        
+        # Clear existing design for this project before saving new one
+        self.db.delete_components(project_id)
+        self.db.delete_edges(project_id)
+
         components = design.get('components', [])
         edges = design.get('edges', [])
 
@@ -133,8 +127,12 @@ class ArchitectAgent(BaseAgent):
         for comp in components:
             # Ensure required fields
             comp_id = comp.get('id') or f"comp_{uuid.uuid4().hex[:8]}"
-            
-            # create_component(self, project_id, label, type='node', parent_id=None, **kwargs)
+
+            # Handle both 'problem' and 'problem_statement' from architect output
+            problem = comp.get('problem') or comp.get('problem_statement')
+
+            # Create component with all fields
+            # Note: database.py handles JSON serialization internally
             self.db.create_component(
                 id=comp_id,
                 project_id=project_id,
@@ -142,27 +140,52 @@ class ArchitectAgent(BaseAgent):
                 type=comp.get('type', 'node'),
                 parent_id=comp.get('parent_id'),
                 summary=comp.get('summary'),
-                problem=comp.get('problem'),
-                goals=json.dumps(comp.get('goals', [])),
-                requirements=json.dumps(comp.get('requirements', [])),
-                inputs=json.dumps(comp.get('inputs', [])),
-                outputs=json.dumps(comp.get('outputs', [])),
-                files=json.dumps(comp.get('files', []))
+                problem=problem,
+                goals=comp.get('goals', []),
+                scope=comp.get('scope', []),
+                requirements=comp.get('requirements', []),
+                risks=comp.get('risks', []),
+                inputs=comp.get('inputs', []),
+                outputs=comp.get('outputs', []),
+                files=comp.get('files', [])
             )
-            # Update specific ID if we want to enforce the Architect's ID
-            # But create_component autogenerates ID, so we might need a raw query or update create_component
-            # For now, let's assume create_component returns the DB ID or we rely on label matching?
-            # Actually, looking at database.py, create_component generates an ID if not provided.
-            # If we want to maintain the Architect's relationships, we MUST control the ID.
-            # BaseAgent doesn't have direct DB SQL access usually, it goes through DB methods.
-            # Let's assume we update `database.py` to allow passing `id` or we insert manually here.
-            # Or better: Update database.py to accept `id`.
-        
+
+            # Save metrics to metrics table
+            for metric in comp.get('metrics', []):
+                self.db.create_metric(
+                    component_id=comp_id,
+                    requirement=metric.get('name', 'Unknown Metric'),
+                    value=metric.get('target'),
+                    status=metric.get('status', 'pending'),
+                    weight=metric.get('weight', 1.0)
+                )
+
+            # Save test cases to test_cases table
+            for test in comp.get('test_cases', []):
+                self.db.create_test_case(
+                    component_id=comp_id,
+                    name=test.get('name', 'Unknown Test'),
+                    status=test.get('status', 'pending'),
+                    value=test.get('description'),
+                    weight=test.get('weight', 1.0)
+                )
+
         for edge in edges:
-            self.db.create_edge(
-                project_id=project_id,
-                from_id=edge['from_id'],
-                to_id=edge['to_id'],
-                label=edge.get('label'),
-                type=edge.get('type', 'data')
-            )
+            # Handle both 'from'/'to' and 'from_id'/'to_id' formats
+            from_id = edge.get('from_id') or edge.get('from')
+            to_id = edge.get('to_id') or edge.get('to')
+
+            if from_id and to_id:
+                self.db.create_edge(
+                    project_id=project_id,
+                    from_id=from_id,
+                    to_id=to_id,
+                    label=edge.get('label'),
+                    type=edge.get('type', 'data')
+                )
+
+        # Save architecture notes to project if present
+        arch_notes = design.get('architecture_notes')
+        if arch_notes:
+            # Append architecture notes to project work_plan field
+            self.db.update_project(project_id, {'work_plan': arch_notes})

@@ -304,10 +304,33 @@ class AgenticHandler(http.server.SimpleHTTPRequestHandler):
                 component = data.get('component', {})
                 section = data.get('section')  # Which PRD section is focused
                 history = data.get('history', [])
+                project_id = data.get('project_id')
+                component_id = component.get('id')
 
                 print(f"[Server] PRD Chat: {message[:50]}... (section: {section})")
 
+                # Save user message to database
+                if project_id and db:
+                    db.create_chat_message(
+                        project_id=project_id,
+                        role='user',
+                        content=message,
+                        component_id=component_id,
+                        section=section
+                    )
+
                 result = self._prd_chat(message, component, section, history)
+
+                # Save assistant response to database
+                if project_id and db and result.get('status') == 'success':
+                    db.create_chat_message(
+                        project_id=project_id,
+                        role='assistant',
+                        content=result.get('response', ''),
+                        component_id=component_id,
+                        section=section
+                    )
+
                 self.send_json(result)
 
             except Exception as e:
@@ -726,7 +749,7 @@ Respond directly and helpfully. Do not use JSON format - just natural text with 
             return
 
         # Get component details
-        if parsed_path.path.startswith('/api/components/'):
+        if parsed_path.path.startswith('/api/components/') and not '/chat' in parsed_path.path:
             component_id = parsed_path.path.split('/')[-1]
             if USE_NEW_AGENTS and api:
                 try:
@@ -739,6 +762,32 @@ Respond directly and helpfully. Do not use JSON format - just natural text with 
                     self.send_json({'status': 'error', 'message': str(e)}, 500)
             else:
                 self.send_json({'status': 'error', 'message': 'Database not available'}, 503)
+            return
+
+        # Get chat history for a component
+        # Format: /api/chat/history?project_id=xxx&component_id=yyy
+        if parsed_path.path == '/api/chat/history':
+            if not USE_NEW_AGENTS or not db:
+                self.send_json({'status': 'error', 'message': 'Database not available'}, 503)
+                return
+
+            query = urllib.parse.parse_qs(parsed_path.query)
+            project_id = query.get('project_id', [None])[0]
+            component_id = query.get('component_id', [None])[0]
+
+            if not project_id:
+                self.send_json({'status': 'error', 'message': 'project_id required'}, 400)
+                return
+
+            try:
+                messages = db.get_chat_history(project_id, component_id)
+                self.send_json({
+                    'status': 'success',
+                    'history': [m.to_chat_format() for m in messages]
+                })
+            except Exception as e:
+                print(f"[Server] Chat history error: {e}")
+                self.send_json({'status': 'error', 'message': str(e)}, 500)
             return
 
         # Get all agents

@@ -85,6 +85,13 @@ class InterviewerAgent(BaseAgent):
         # Validate and enhance the brief
         brief = self._validate_brief(brief, user_prompt)
 
+        # Build transcript from initial conversation
+        transcript = f"[{datetime.now().isoformat()}] USER:\n{user_prompt}\n\n"
+        transcript += f"[{datetime.now().isoformat()}] INTERVIEWER:\nAnalyzed project and identified {len(brief.get('components', []))} components.\n"
+        if brief.get('questions'):
+            transcript += f"Clarifying questions:\n" + "\n".join(f"- {q}" for q in brief['questions'])
+        brief['_transcript'] = transcript
+
         # Save to database
         project = self._save_to_database(brief, project_id)
         brief['project_id'] = project.id
@@ -236,15 +243,22 @@ class InterviewerAgent(BaseAgent):
 
     def _save_to_database(self, brief: Dict[str, Any], project_id: Optional[str] = None) -> Project:
         """Save the brief to the database."""
+        transcript = brief.get('_transcript', '')
+
         # Create or update project
         if project_id:
             project = self.db.get_project(project_id)
             if project:
+                # Append to existing transcript
+                existing_transcript = project.transcript or ''
+                if transcript:
+                    transcript = existing_transcript + "\n\n" + transcript if existing_transcript else transcript
                 self.db.update_project(project_id, {
                     'name': brief['title'],
                     'summary': brief['summary'],
                     'problem': brief['problem'],
                     'questions': brief.get('questions', []),
+                    'transcript': transcript,
                     'phase': 'interview'
                 })
             else:
@@ -260,6 +274,9 @@ class InterviewerAgent(BaseAgent):
                 questions=brief.get('questions', []),
                 phase='interview'
             )
+            # Save transcript separately since create_project doesn't have transcript param
+            if transcript:
+                self.db.update_project(project_id, {'transcript': transcript})
 
         # Save components
         for comp in brief.get('components', []):
@@ -346,6 +363,13 @@ class InterviewerAgent(BaseAgent):
         """
         self.log('refine_start', f'Refining brief with {len(answers)} answers')
 
+        # Build transcript entry for this refinement
+        transcript = f"\n[{datetime.now().isoformat()}] REFINEMENT #{original_brief.get('refinement_iteration', 0) + 1}:\n"
+        for q, a in answers.items():
+            transcript += f"Q: {q}\nA: {a}\n\n"
+        if additional_context:
+            transcript += f"Additional context: {additional_context}\n"
+
         # Build the refinement prompt
         original_summary = original_brief.get('summary', '')
         original_questions = original_brief.get('questions', [])
@@ -399,6 +423,20 @@ Analyze this and create an updated structured brief:"""
         # Track refinement iteration
         refined_brief['refinement_iteration'] = original_brief.get('refinement_iteration', 0) + 1
         refined_brief['project_id'] = original_brief.get('project_id')
+
+        # Add transcript entry for this refinement
+        transcript += f"[{datetime.now().isoformat()}] INTERVIEWER:\nRefined to {len(refined_brief.get('components', []))} components.\n"
+        if refined_brief.get('questions'):
+            transcript += f"New clarifying questions:\n" + "\n".join(f"- {q}" for q in refined_brief['questions'])
+
+        # Save transcript to database
+        project_id = original_brief.get('project_id')
+        if project_id and self.db:
+            project = self.db.get_project(project_id)
+            if project:
+                existing_transcript = project.transcript or ''
+                full_transcript = existing_transcript + transcript
+                self.db.update_project(project_id, {'transcript': full_transcript})
 
         self.log('refine_complete', f'Refined to {len(refined_brief.get("components", []))} components')
 

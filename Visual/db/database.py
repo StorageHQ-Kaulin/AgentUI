@@ -11,7 +11,7 @@ from datetime import datetime
 
 from .models import (
     Project, Component, Edge, Agent, Task, Log,
-    Manager, Metric, TestCase, GlobalTask
+    Manager, Metric, TestCase, GlobalTask, ChatMessage
 )
 
 
@@ -730,6 +730,83 @@ class Database:
                 (project_id, f"%{task_pattern}%")
             )
             return cursor.rowcount > 0
+
+    # =========================================================================
+    # CHAT HISTORY OPERATIONS
+    # =========================================================================
+
+    def create_chat_message(
+        self,
+        project_id: str,
+        role: str,
+        content: str,
+        component_id: str = None,
+        section: str = None
+    ) -> ChatMessage:
+        """Create a new chat message."""
+        with self.connection() as conn:
+            cursor = conn.execute(
+                """INSERT INTO chat_history (project_id, component_id, role, content, section)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (project_id, component_id, role, content, section)
+            )
+            msg_id = cursor.lastrowid
+        return ChatMessage(
+            id=msg_id,
+            project_id=project_id,
+            component_id=component_id,
+            role=role,
+            content=content,
+            section=section,
+            created_at=datetime.now().isoformat()
+        )
+
+    def get_chat_history(
+        self,
+        project_id: str,
+        component_id: str = None,
+        limit: int = 50
+    ) -> List[ChatMessage]:
+        """Get chat history for a project/component."""
+        with self.connection() as conn:
+            if component_id:
+                rows = conn.execute(
+                    """SELECT * FROM chat_history
+                       WHERE project_id = ? AND component_id = ?
+                       ORDER BY created_at ASC LIMIT ?""",
+                    (project_id, component_id, limit)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """SELECT * FROM chat_history
+                       WHERE project_id = ?
+                       ORDER BY created_at ASC LIMIT ?""",
+                    (project_id, limit)
+                ).fetchall()
+            return [ChatMessage(
+                id=row['id'],
+                project_id=row['project_id'],
+                component_id=row['component_id'],
+                role=row['role'],
+                content=row['content'],
+                section=row['section'],
+                created_at=row['created_at']
+            ) for row in rows]
+
+    def delete_chat_history(self, project_id: str, component_id: str = None) -> int:
+        """Delete chat history for a project or component."""
+        with self.connection() as conn:
+            if component_id:
+                cursor = conn.execute(
+                    "DELETE FROM chat_history WHERE project_id = ? AND component_id = ?",
+                    (project_id, component_id)
+                )
+            else:
+                cursor = conn.execute(
+                    "DELETE FROM chat_history WHERE project_id = ?",
+                    (project_id,)
+                )
+            return cursor.rowcount
 
     # =========================================================================
     # GRAPH DATA GENERATION

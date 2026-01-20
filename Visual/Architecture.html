@@ -1498,7 +1498,17 @@
                         </div>
                     </div>
 
-                    <!-- PRD Section 5: Acceptance Criteria -->
+                    <!-- PRD Section 5: External Systems -->
+                    <div class="prd-section" data-section="external">
+                        <div class="prd-section-header">
+                            <span class="prd-section-title">External Systems</span>
+                        </div>
+                        <div class="prd-card">
+                            <div id="detailExternalSystems"></div>
+                        </div>
+                    </div>
+
+                    <!-- PRD Section 6: Acceptance Criteria -->
                     <div class="prd-section" data-section="acceptance">
                         <div class="prd-section-header">
                             <span class="prd-section-title">Acceptance Criteria</span>
@@ -1774,6 +1784,7 @@
                 item.className = `component-item ${comp.type || 'service'}`;
                 item.dataset.id = comp.id;
 
+                // Real counts only
                 const goalsCount = (comp.goals || []).length;
                 const testsCount = (comp.test_cases || []).length;
                 const metricsCount = (comp.metrics || []).length;
@@ -1805,6 +1816,42 @@
             const comp = architecture.components.find(c => c.id === compId);
             if (comp) {
                 showComponentDetail(comp);
+                // Load chat history for this component
+                loadChatHistory(compId);
+            }
+        }
+
+        async function loadChatHistory(componentId) {
+            if (!projectId) return;
+
+            try {
+                const response = await fetch(`/api/chat/history?project_id=${projectId}&component_id=${componentId}`);
+                const data = await response.json();
+
+                if (data.status === 'success' && data.history) {
+                    // Clear current chat display
+                    const messagesContainer = document.getElementById('chatMessages');
+                    messagesContainer.innerHTML = '';
+                    chatHistory = [];
+
+                    // Restore messages
+                    data.history.forEach(msg => {
+                        const type = msg.type === 'user' ? 'user' : 'ai';
+                        const content = type === 'ai' ? formatAIResponse(msg.content) : msg.content;
+                        addChatMessage(type, content);
+                        chatHistory.push({ role: msg.type, content: msg.content });
+                    });
+
+                    // If no history, show welcome message
+                    if (data.history.length === 0) {
+                        const comp = architecture.components.find(c => c.id === componentId);
+                        if (comp) {
+                            addChatMessage('ai', `Ready to help with <strong>${comp.label}</strong>. Ask me about requirements, tests, risks, or anything else!`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('Could not load chat history:', err);
             }
         }
 
@@ -1815,6 +1862,14 @@
 
             // Store for PRD export
             window.currentPRDComponent = comp;
+
+            // Update chat suggestions to show connect options
+            if (typeof updateSuggestionsForSection === 'function') {
+                updateSuggestionsForSection(currentChatSection);
+            }
+            if (typeof updateChatContext === 'function') {
+                updateChatContext();
+            }
 
             document.getElementById('detailTitle').textContent = comp.label || comp.id;
             document.getElementById('detailType').textContent = comp.type || 'component';
@@ -1896,7 +1951,70 @@
             }
             depsDiv.innerHTML = depsHtml;
 
-            // === SECTION 5: Acceptance Criteria ===
+            // === SECTION 5: External Systems ===
+            const externalSystems = generateExternalSystems(comp);
+            const linkedExternal = findLinkedExternalSystems(comp.id);
+            const externalDiv = document.getElementById('detailExternalSystems');
+            let externalHtml = '';
+
+            // Show linked architecture components first
+            if (linkedExternal.length > 0) {
+                externalHtml += '<div class="prd-field"><label>Linked in Architecture</label>';
+                externalHtml += linkedExternal.map(ext => `
+                    <div style="background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(20, 184, 166, 0.3); border-left: 2px solid #14b8a6; border-radius: 4px; padding: 8px; margin-bottom: 6px; cursor: pointer;" onclick="selectComponent('${ext.id}')">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-weight: 600; color: #5eead4; font-size: 12px;">${ext.label}</div>
+                            <span style="font-size: 9px; background: rgba(20, 184, 166, 0.3); padding: 2px 6px; border-radius: 3px; color: #14b8a6;">${ext.type}</span>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${ext.summary || 'External system component'}</div>
+                        <div style="font-size: 10px; color: #14b8a6; margin-top: 4px;">Connection: ${ext.connectionType} → Click to view</div>
+                    </div>
+                `).join('');
+                externalHtml += '</div>';
+            }
+
+            if (externalSystems.apis.length > 0) {
+                externalHtml += '<div class="prd-field"><label>External APIs</label>';
+                externalHtml += externalSystems.apis.map(api => `
+                    <div style="background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); border-left: 2px solid #0ea5e9; border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                        <div style="font-weight: 600; color: #7dd3fc; font-size: 12px;">${api.name}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${api.description}</div>
+                        <div style="font-size: 10px; color: #0ea5e9; margin-top: 4px;">Endpoint: ${api.endpoint || 'TBD'}</div>
+                    </div>
+                `).join('');
+                externalHtml += '</div>';
+            }
+
+            if (externalSystems.services.length > 0) {
+                externalHtml += '<div class="prd-field"><label>Third-Party Services</label>';
+                externalHtml += externalSystems.services.map(svc => `
+                    <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-left: 2px solid #a855f7; border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                        <div style="font-weight: 600; color: #c4b5fd; font-size: 12px;">${svc.name}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${svc.description}</div>
+                        ${svc.credentials ? `<div style="font-size: 10px; color: #f59e0b; margin-top: 4px;">Requires: ${svc.credentials}</div>` : ''}
+                    </div>
+                `).join('');
+                externalHtml += '</div>';
+            }
+
+            if (externalSystems.databases.length > 0) {
+                externalHtml += '<div class="prd-field"><label>External Databases</label>';
+                externalHtml += externalSystems.databases.map(db => `
+                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-left: 2px solid #f59e0b; border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                        <div style="font-weight: 600; color: #fcd34d; font-size: 12px;">${db.name}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${db.description}</div>
+                        <div style="font-size: 10px; color: #f59e0b; margin-top: 4px;">Type: ${db.type || 'Database'}</div>
+                    </div>
+                `).join('');
+                externalHtml += '</div>';
+            }
+
+            if (!externalHtml) {
+                externalHtml = '<p style="color: var(--text-muted); font-size: 12px;">No external systems identified for this component.</p>';
+            }
+            externalDiv.innerHTML = externalHtml;
+
+            // === SECTION 6: Acceptance Criteria ===
             const acceptance = generateAcceptanceCriteria(comp);
             document.getElementById('detailAcceptance').innerHTML = acceptance.criteria.map(c => `<li>${c}</li>`).join('');
             document.getElementById('detailEdgeCases').innerHTML = acceptance.edgeCases.map(e => `<li>${e}</li>`).join('');
@@ -1987,59 +2105,74 @@
             const outOfScope = [];
             const assumptions = [];
 
-            // In scope from goals
-            (comp.goals || []).forEach(g => {
-                inScope.push(g);
-            });
+            // Check if component has scope data from architect
+            const scopeData = comp.scope || [];
+            if (scopeData.length > 0) {
+                // Parse scope items - items starting with "NOT:" are out of scope
+                scopeData.forEach(item => {
+                    if (item.startsWith('NOT:') || item.startsWith('NOT ')) {
+                        outOfScope.push(item.replace(/^NOT:?\s*/, ''));
+                    } else {
+                        inScope.push(item);
+                    }
+                });
+            }
 
-            // In scope from requirements
-            (comp.requirements || []).forEach(r => {
-                if (!inScope.some(s => s.includes(r.substring(0, 20)))) {
-                    inScope.push(r);
-                }
-            });
+            // If no scope data, generate from goals and requirements
+            if (inScope.length === 0) {
+                (comp.goals || []).forEach(g => {
+                    inScope.push(g);
+                });
 
-            // Generate out-of-scope based on component type
-            const typeExclusions = {
-                'data': [
-                    'Business logic processing',
-                    'User authentication/authorization',
-                    'API endpoint definitions',
-                    'Frontend rendering'
-                ],
-                'api': [
-                    'Database schema design',
-                    'Business logic implementation',
-                    'Frontend UI components',
-                    'Background job processing'
-                ],
-                'ui': [
-                    'Backend API implementation',
-                    'Database operations',
-                    'Authentication logic',
-                    'Data validation beyond input formatting'
-                ],
-                'service': [
-                    'Direct database access (use data layer)',
-                    'HTTP request handling (use API layer)',
-                    'UI rendering',
-                    'External API calls (use integration layer)'
-                ],
-                'security': [
-                    'Business logic',
-                    'Data storage',
-                    'UI components',
-                    'External integrations'
-                ],
-                'integration': [
-                    'Internal business logic',
-                    'User authentication',
-                    'Data storage',
-                    'UI components'
-                ]
-            };
+                (comp.requirements || []).forEach(r => {
+                    if (!inScope.some(s => s.includes(r.substring(0, 20)))) {
+                        inScope.push(r);
+                    }
+                });
+            }
 
-            outOfScope.push(...(typeExclusions[comp.type] || typeExclusions['service']));
+            // If no out-of-scope data, generate based on component type
+            if (outOfScope.length === 0) {
+                const typeExclusions = {
+                    'data': [
+                        'Business logic processing',
+                        'User authentication/authorization',
+                        'API endpoint definitions',
+                        'Frontend rendering'
+                    ],
+                    'api': [
+                        'Database schema design',
+                        'Business logic implementation',
+                        'Frontend UI components',
+                        'Background job processing'
+                    ],
+                    'ui': [
+                        'Backend API implementation',
+                        'Database operations',
+                        'Authentication logic',
+                        'Data validation beyond input formatting'
+                    ],
+                    'service': [
+                        'Direct database access (use data layer)',
+                        'HTTP request handling (use API layer)',
+                        'UI rendering',
+                        'External API calls (use integration layer)'
+                    ],
+                    'security': [
+                        'Business logic',
+                        'Data storage',
+                        'UI components',
+                        'External integrations'
+                    ],
+                    'integration': [
+                        'Internal business logic',
+                        'User authentication',
+                        'Data storage',
+                        'UI components'
+                    ]
+                };
+                outOfScope.push(...(typeExclusions[comp.type] || typeExclusions['service']));
+            }
 
             // Assumptions based on dependencies
             const deps = findComponentDependencies(comp.id);
@@ -2208,6 +2341,104 @@
             return 'Object';
         }
 
+        function generateExternalSystems(comp) {
+            const apis = [];
+            const services = [];
+            const databases = [];
+
+            const type = comp.type || 'service';
+            const label = (comp.label || '').toLowerCase();
+
+            // Type-specific external systems
+            const typeExternals = {
+                'api': {
+                    apis: [
+                        { name: 'Authentication Provider', description: 'Validate tokens and user sessions', endpoint: '/auth/validate' }
+                    ],
+                    services: [],
+                    databases: []
+                },
+                'data': {
+                    apis: [],
+                    services: [
+                        { name: 'Cache Layer', description: 'Redis or Memcached for query caching', credentials: 'CACHE_URL' }
+                    ],
+                    databases: [
+                        { name: 'Primary Database', description: 'Main data store for persistent data', type: 'PostgreSQL/MySQL' }
+                    ]
+                },
+                'integration': {
+                    apis: [
+                        { name: 'External API', description: 'Third-party service integration', endpoint: 'https://api.external.com' }
+                    ],
+                    services: [
+                        { name: 'Message Queue', description: 'Async message processing', credentials: 'QUEUE_URL' }
+                    ],
+                    databases: []
+                },
+                'security': {
+                    apis: [
+                        { name: 'OAuth Provider', description: 'External identity provider', endpoint: '/oauth/authorize' }
+                    ],
+                    services: [
+                        { name: 'Secret Manager', description: 'Secure credential storage', credentials: 'SECRETS_API_KEY' }
+                    ],
+                    databases: []
+                },
+                'service': {
+                    apis: [],
+                    services: [],
+                    databases: []
+                },
+                'ui': {
+                    apis: [
+                        { name: 'Backend API', description: 'Server-side data endpoints', endpoint: '/api/v1' }
+                    ],
+                    services: [
+                        { name: 'CDN', description: 'Static asset delivery', credentials: 'CDN_URL' }
+                    ],
+                    databases: []
+                },
+                'utility': {
+                    apis: [],
+                    services: [
+                        { name: 'Logging Service', description: 'Centralized log aggregation', credentials: 'LOG_API_KEY' }
+                    ],
+                    databases: []
+                }
+            };
+
+            // Get type-specific externals
+            const typeConfig = typeExternals[type] || typeExternals['service'];
+            apis.push(...typeConfig.apis);
+            services.push(...typeConfig.services);
+            databases.push(...typeConfig.databases);
+
+            // Check component label for common patterns
+            if (label.includes('payment') || label.includes('billing')) {
+                apis.push({ name: 'Payment Gateway', description: 'Process payments via Stripe/PayPal', endpoint: 'https://api.stripe.com' });
+                services.push({ name: 'PCI Compliance', description: 'Secure payment data handling', credentials: 'PAYMENT_API_KEY' });
+            }
+
+            if (label.includes('email') || label.includes('notification')) {
+                services.push({ name: 'Email Service', description: 'SendGrid/SES for email delivery', credentials: 'EMAIL_API_KEY' });
+            }
+
+            if (label.includes('storage') || label.includes('upload') || label.includes('file')) {
+                services.push({ name: 'Object Storage', description: 'S3/GCS for file storage', credentials: 'STORAGE_CREDENTIALS' });
+            }
+
+            if (label.includes('search')) {
+                services.push({ name: 'Search Engine', description: 'Elasticsearch/Algolia for search', credentials: 'SEARCH_API_KEY' });
+            }
+
+            if (label.includes('analytics') || label.includes('tracking')) {
+                apis.push({ name: 'Analytics API', description: 'Event tracking and reporting', endpoint: '/analytics/events' });
+            }
+
+            return { apis, services, databases };
+        }
+
         function generateAcceptanceCriteria(comp) {
             const criteria = [];
             const edgeCases = [];
@@ -2313,13 +2544,25 @@
             };
             errorHandling.push(...(typeErrors[comp.type] || typeErrors['service']));
 
+            // Include actual risks from architect output
+            const risks = comp.risks || [];
+            if (risks.length > 0) {
+                risks.forEach(risk => {
+                    // Add as edge case if not already included
+                    if (!edgeCases.some(e => e.toLowerCase().includes(risk.toLowerCase().substring(0, 20)))) {
+                        edgeCases.push(`RISK: ${risk}`);
+                    }
+                });
+            }
+
             return { criteria, edgeCases, errorHandling };
         }
 
         function generateTestCases(comp) {
-            // Use existing test cases if available
-            if (comp.test_cases && comp.test_cases.length > 0) {
-                return comp.test_cases.map(t => ({
+            // Use existing test cases if available (handle both camelCase and snake_case)
+            const existingTests = comp.testCases || comp.test_cases || [];
+            if (existingTests.length > 0) {
+                return existingTests.map(t => ({
                     name: t.name,
                     description: t.description || '',
                     status: t.status || 'pending',
@@ -2882,6 +3125,55 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
             return { dependsOn, dependedBy };
         }
 
+        function findLinkedExternalSystems(compId) {
+            const external = [];
+
+            if (!architecture || !architecture.edges || !architecture.components) {
+                return external;
+            }
+
+            // Types that represent external systems
+            const externalTypes = ['integration', 'data'];
+
+            // Labels that suggest external systems
+            const externalKeywords = ['external', 'api', 'database', 'db', 'cache', 'queue', 'storage', 'cdn', 'auth', 'oauth', 'payment', 'email', 'sms', 'notification', 'third-party', 'service'];
+
+            const isExternalComponent = (comp) => {
+                if (externalTypes.includes(comp.type)) return true;
+                const labelLower = (comp.label || '').toLowerCase();
+                return externalKeywords.some(kw => labelLower.includes(kw));
+            };
+
+            // Find connected components that are external systems
+            architecture.edges.forEach(edge => {
+                let linkedComp = null;
+                let connectionType = '';
+
+                if (edge.from === compId) {
+                    linkedComp = architecture.components.find(c => c.id === edge.to);
+                    connectionType = `outbound ${edge.type || 'data'}`;
+                } else if (edge.to === compId) {
+                    linkedComp = architecture.components.find(c => c.id === edge.from);
+                    connectionType = `inbound ${edge.type || 'data'}`;
+                }
+
+                if (linkedComp && isExternalComponent(linkedComp)) {
+                    // Avoid duplicates
+                    if (!external.some(e => e.id === linkedComp.id)) {
+                        external.push({
+                            id: linkedComp.id,
+                            label: linkedComp.label,
+                            type: linkedComp.type,
+                            summary: linkedComp.summary,
+                            connectionType: connectionType
+                        });
+                    }
+                }
+            });
+
+            return external;
+        }
+
         window.startImplementation = function() {
             if (!selectedComponentId) {
                 alert('Please select a component first');
@@ -3153,6 +3445,7 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                         'scope': 'Scope & Boundaries',
                         'interface': 'Interface Contract',
                         'dependencies': 'Dependencies',
+                        'external': 'External Systems',
                         'acceptance': 'Acceptance Criteria',
                         'metrics': 'Success Metrics',
                         'implementation': 'Implementation Guide',
@@ -3190,6 +3483,11 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                     { text: 'Reduce coupling', action: 'How can I reduce coupling to dependencies?' },
                     { text: 'Mock strategy', action: 'How should I mock these dependencies for testing?' }
                 ],
+                'external': [
+                    { text: 'Add API', action: 'What external APIs might this component need?' },
+                    { text: 'Add service', action: 'What third-party services should I integrate?' },
+                    { text: 'Fallbacks', action: 'What fallback strategies for external system failures?' }
+                ],
                 'acceptance': [
                     { text: 'Add criteria', action: 'What acceptance criteria am I missing?' },
                     { text: 'Add edge cases', action: 'What edge cases should I handle?' },
@@ -3217,11 +3515,28 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                 ]
             };
 
-            const sectionSuggestions = suggestions[section] || [
-                { text: 'Add edge cases', action: 'Add more edge cases' },
-                { text: 'Simplify', action: 'Simplify the scope' },
-                { text: 'Add validation', action: 'Add input validation' }
-            ];
+            let sectionSuggestions = suggestions[section];
+
+            if (!sectionSuggestions) {
+                // Default suggestions - include connect options if component selected
+                const comp = window.currentPRDComponent;
+                if (comp && architecture?.components) {
+                    const otherComps = architecture.components
+                        .filter(c => c.id !== comp.id)
+                        .slice(0, 2);
+                    sectionSuggestions = [
+                        { text: '+ Add component', action: 'Add a service called ' },
+                        ...otherComps.map(c => ({ text: `→ ${c.label}`, action: `Connect ${comp.label} to ${c.label}` })),
+                        { text: '+ New connection', action: `Connect ${comp.label} to ` }
+                    ];
+                } else {
+                    sectionSuggestions = [
+                        { text: '+ Add component', action: 'Add a service called ' },
+                        { text: '+ Add connection', action: 'Connect  to ' },
+                        { text: 'Suggest components', action: 'What components should I add to this architecture?' }
+                    ];
+                }
+            }
 
             suggestionsEl.innerHTML = sectionSuggestions.map(s =>
                 `<span class="chat-suggestion" onclick="useSuggestion('${s.action}')">${s.text}</span>`
@@ -3239,14 +3554,190 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
             }
         };
 
+        // Architecture modification functions
+        function addComponentToArchitecture(name, type, summary, connectTo = null, connectionType = 'data') {
+            if (!architecture) {
+                architecture = { components: [], edges: [] };
+            }
+
+            const id = 'comp_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+
+            const newComponent = {
+                id: id,
+                label: name,
+                type: type || 'service',
+                summary: summary || `${name} component`,
+                problem_statement: `Handles ${name.toLowerCase()} functionality`,
+                goals: [`Provide ${name.toLowerCase()} capabilities`],
+                requirements: [`Implement core ${name.toLowerCase()} logic`],
+                inputs: [],
+                outputs: [],
+                files: []
+            };
+
+            architecture.components.push(newComponent);
+
+            // Connect to existing component if specified
+            if (connectTo) {
+                const targetComp = architecture.components.find(c =>
+                    c.id === connectTo ||
+                    c.label.toLowerCase() === connectTo.toLowerCase()
+                );
+                if (targetComp) {
+                    architecture.edges.push({
+                        from: id,
+                        to: targetComp.id,
+                        type: connectionType,
+                        label: connectionType
+                    });
+                }
+            }
+
+            // Re-render
+            renderComponentTree();
+            renderDiagram();
+
+            return newComponent;
+        }
+
+        function addEdgeToArchitecture(fromLabel, toLabel, edgeType = 'data') {
+            if (!architecture || !architecture.components) return null;
+
+            const fromComp = architecture.components.find(c =>
+                c.id === fromLabel || c.label.toLowerCase() === fromLabel.toLowerCase()
+            );
+            const toComp = architecture.components.find(c =>
+                c.id === toLabel || c.label.toLowerCase() === toLabel.toLowerCase()
+            );
+
+            if (fromComp && toComp) {
+                const edge = {
+                    from: fromComp.id,
+                    to: toComp.id,
+                    type: edgeType,
+                    label: edgeType
+                };
+                architecture.edges.push(edge);
+                renderDiagram();
+                return edge;
+            }
+            return null;
+        }
+
+        function parseAddCommand(message) {
+            const lower = message.toLowerCase();
+
+            // Patterns: "add a service called X", "add X component", "create a new X"
+            const patterns = [
+                /add\s+(?:a\s+)?(\w+)\s+(?:component\s+)?(?:called|named)\s+["']?([^"']+)["']?/i,
+                /add\s+(?:a\s+)?(?:new\s+)?["']?([^"']+)["']?\s+(\w+)(?:\s+component)?/i,
+                /create\s+(?:a\s+)?(?:new\s+)?(\w+)\s+(?:called|named)\s+["']?([^"']+)["']?/i,
+                /add\s+["']?([^"']+)["']?\s+as\s+(?:a\s+)?(\w+)/i,
+                /add\s+(?:a\s+)?["']?([^"']+)["']?$/i
+            ];
+
+            const componentTypes = ['service', 'api', 'data', 'ui', 'security', 'utility', 'integration', 'root'];
+
+            for (const pattern of patterns) {
+                const match = message.match(pattern);
+                if (match) {
+                    let name, type;
+                    if (componentTypes.includes(match[1]?.toLowerCase())) {
+                        type = match[1].toLowerCase();
+                        name = match[2];
+                    } else if (componentTypes.includes(match[2]?.toLowerCase())) {
+                        name = match[1];
+                        type = match[2].toLowerCase();
+                    } else {
+                        name = match[1] || match[2];
+                        type = 'service'; // default
+                    }
+                    return { name, type };
+                }
+            }
+            return null;
+        }
+
+        function parseConnectCommand(message) {
+            const patterns = [
+                /connect\s+["']?([^"']+)["']?\s+to\s+["']?([^"']+)["']?(?:\s+(?:with|as|via)\s+(\w+))?/i,
+                /link\s+["']?([^"']+)["']?\s+to\s+["']?([^"']+)["']?/i
+            ];
+
+            for (const pattern of patterns) {
+                const match = message.match(pattern);
+                if (match) {
+                    return {
+                        from: match[1],
+                        to: match[2],
+                        type: match[3] || 'data'
+                    };
+                }
+            }
+            return null;
+        }
+
         window.sendChatMessage = async function() {
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
             if (!message) return;
 
+            // Check for architecture modification commands (don't require component selection)
+            const addCmd = parseAddCommand(message);
+            const connectCmd = parseConnectCommand(message);
+
+            if (addCmd) {
+                addChatMessage('user', message);
+                input.value = '';
+
+                const comp = window.currentPRDComponent;
+                const newComp = addComponentToArchitecture(
+                    addCmd.name,
+                    addCmd.type,
+                    `${addCmd.name} - ${addCmd.type} component`,
+                    comp ? comp.id : null
+                );
+
+                // Build list of other components to connect to
+                const otherComps = (architecture?.components || [])
+                    .filter(c => c.id !== newComp.id)
+                    .slice(0, 5)
+                    .map(c => c.label);
+
+                let response = `Added new <strong>${addCmd.type}</strong> component: <strong>${addCmd.name}</strong>${comp ? ` and connected it to ${comp.label}` : ''}.`;
+
+                if (otherComps.length > 0 && !comp) {
+                    response += `<br><br>Connect it to other components:<br>`;
+                    response += otherComps.map(name =>
+                        `<span class="chat-suggestion" onclick="useSuggestion('Connect ${addCmd.name} to ${name}')" style="margin: 2px; display: inline-block;">→ ${name}</span>`
+                    ).join('');
+                }
+
+                addChatMessage('ai', response);
+
+                // Select the new component
+                setTimeout(() => selectComponent(newComp.id), 100);
+                return;
+            }
+
+            if (connectCmd) {
+                addChatMessage('user', message);
+                input.value = '';
+
+                const edge = addEdgeToArchitecture(connectCmd.from, connectCmd.to, connectCmd.type);
+                if (edge) {
+                    addChatMessage('ai', `Connected <strong>${connectCmd.from}</strong> → <strong>${connectCmd.to}</strong> with <strong>${connectCmd.type}</strong> connection.`);
+                } else {
+                    addChatMessage('ai', `Could not find components "${connectCmd.from}" or "${connectCmd.to}". Make sure the names match existing components.`);
+                }
+                return;
+            }
+
             const comp = window.currentPRDComponent;
             if (!comp) {
-                addChatMessage('ai', 'Please select a component first so I can help you refine its design.');
+                addChatMessage('user', message);
+                input.value = '';
+                addChatMessage('ai', 'Select a component to discuss its design, or use commands like:<br><br>• <strong>Add a service called Auth</strong><br>• <strong>Add Database component</strong><br>• <strong>Connect Auth to Database</strong>');
                 return;
             }
 
@@ -3268,7 +3759,8 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                         message: message,
                         component: context,
                         section: currentChatSection,
-                        history: chatHistory.slice(-6)
+                        history: chatHistory.slice(-6),
+                        project_id: projectId
                     })
                 });
 
@@ -3439,6 +3931,18 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                             return `To reduce coupling for ${comp.label}:\n\n• Use interfaces/contracts instead of concrete implementations\n• Inject dependencies rather than creating them\n• Use events for loose communication\n• Cache or buffer data to reduce call frequency\n\nWhich dependencies are too tightly coupled?`;
                         }
                         return `For Dependencies, I can help:\n• Identify missing dependencies\n• Reduce coupling\n• Plan mocking strategy\n\nWhat's your concern?`;
+                    },
+                    'external': () => {
+                        if (lower.includes('api') || lower.includes('endpoint')) {
+                            return `External APIs for ${comp.label} to consider:\n\n• Authentication (OAuth, JWT validation)\n• Payment processing (Stripe, PayPal)\n• Email/SMS (SendGrid, Twilio)\n• Storage (S3, GCS)\n• Analytics (Mixpanel, Segment)\n\nWhich external APIs does this component need?`;
+                        }
+                        if (lower.includes('service') || lower.includes('third')) {
+                            return `Third-party services for ${comp.label}:\n\n• Caching (Redis, Memcached)\n• Search (Elasticsearch, Algolia)\n• Message queues (RabbitMQ, SQS)\n• Monitoring (Datadog, New Relic)\n• CDN (CloudFront, Cloudflare)\n\nWhich services would improve ${comp.label}?`;
+                        }
+                        if (lower.includes('fallback') || lower.includes('failure')) {
+                            return `Fallback strategies for external system failures:\n\n• Circuit breaker pattern for repeated failures\n• Cached responses as fallback data\n• Graceful degradation of features\n• Retry with exponential backoff\n• Queue requests for later processing\n\nWhich failures need handling?`;
+                        }
+                        return `For External Systems, I can help:\n• Identify needed external APIs\n• Suggest third-party services\n• Plan fallback strategies\n\nWhat aspect needs work?`;
                     },
                     'acceptance': () => {
                         if (lower.includes('criteria') || lower.includes('missing')) {

@@ -155,8 +155,8 @@ class Metric:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'req': self.requirement,
-            'value': self.value or '',
+            'name': self.requirement,
+            'target': self.value or '',
             'status': self.status,
             'weight': self.weight
         }
@@ -175,8 +175,8 @@ class TestCase:
     def to_dict(self) -> Dict[str, Any]:
         return {
             'name': self.name,
+            'description': self.value or '',
             'status': self.status,
-            'value': self.value or '',
             'weight': self.weight
         }
 
@@ -322,4 +322,35 @@ class GlobalTask:
             'text': self.text,
             'done': self.done,
             'sort_order': self.sort_order
+        }
+
+
+@dataclass
+class ChatMessage:
+    """Represents a chat message in component/PRD conversations."""
+    id: Optional[int]
+    project_id: str
+    role: str  # 'user' or 'assistant'
+    content: str
+    component_id: Optional[str] = None
+    section: Optional[str] = None
+    created_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'project_id': self.project_id,
+            'component_id': self.component_id,
+            'role': self.role,
+            'content': self.content,
+            'section': self.section,
+            'created_at': self.created_at
+        }
+
+    def to_chat_format(self) -> Dict[str, Any]:
+        """Convert to frontend chat format."""
+        return {
+            'type': self.role,
+            'content': self.content,
+            'timestamp': self.created_at
         }
