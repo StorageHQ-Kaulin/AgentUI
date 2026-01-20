@@ -357,6 +357,70 @@ class AgenticHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json(result)
             return
 
+        # Start GM phase - create build plans for all components
+        if parsed_path.path.startswith('/api/projects/') and parsed_path.path.endswith('/start-gm'):
+            if not USE_NEW_AGENTS or not db:
+                self.send_json({'status': 'error', 'message': 'Database not available'}, 503)
+                return
+
+            parts = parsed_path.path.split('/')
+            project_id = parts[3] if len(parts) >= 4 else None
+
+            if not project_id:
+                self.send_json({'status': 'error', 'message': 'Project ID required'}, 400)
+                return
+
+            try:
+                print(f"[Server] Starting GM phase for project {project_id}...")
+                from agents import GeneralManagerAgent
+                gm = GeneralManagerAgent(db)
+                work_plan = gm.execute(project_id)
+
+                self.send_json({
+                    'status': 'success',
+                    'message': 'GM phase complete',
+                    'work_plan': work_plan
+                })
+            except Exception as e:
+                print(f"[Server] GM phase error: {e}")
+                traceback.print_exc()
+                self.send_json({'status': 'error', 'message': str(e)}, 500)
+            return
+
+        # Get work plan for a project
+        if parsed_path.path.startswith('/api/projects/') and parsed_path.path.endswith('/work-plan'):
+            if not USE_NEW_AGENTS or not db:
+                self.send_json({'status': 'error', 'message': 'Database not available'}, 503)
+                return
+
+            parts = parsed_path.path.split('/')
+            project_id = parts[3] if len(parts) >= 4 else None
+
+            if not project_id:
+                self.send_json({'status': 'error', 'message': 'Project ID required'}, 400)
+                return
+
+            try:
+                project = db.get_project(project_id)
+                if not project:
+                    self.send_json({'status': 'error', 'message': 'Project not found'}, 404)
+                    return
+
+                work_plan = project.work_plan
+                if work_plan:
+                    try:
+                        work_plan = json.loads(work_plan)
+                    except:
+                        pass
+
+                self.send_json({
+                    'status': 'success',
+                    'work_plan': work_plan
+                })
+            except Exception as e:
+                self.send_json({'status': 'error', 'message': str(e)}, 500)
+            return
+
         self.send_error(404, "Endpoint not found")
 
     def _run_new_interview(self, user_prompt: str, model: str = None) -> tuple:

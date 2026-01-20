@@ -1571,7 +1571,7 @@
                 </div>
                 <div class="quick-actions">
                     <button class="quick-btn" onclick="copyPRD()">Copy as PRD</button>
-                    <button class="quick-btn" onclick="startImplementation()">Start Building</button>
+                    <button class="quick-btn" onclick="startImplementation()">Proceed To GM Phase</button>
                 </div>
             </div>
         </div>
@@ -3174,12 +3174,58 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
             return external;
         }
 
-        window.startImplementation = function() {
-            if (!selectedComponentId) {
-                alert('Please select a component first');
+        window.startImplementation = async function() {
+            if (!projectId) {
+                alert('No project loaded');
                 return;
             }
-            alert(`Starting implementation for component: ${selectedComponentId}\n\nThis would trigger the worker agents to begin building this component.`);
+
+            // Confirm with user
+            const componentCount = architecture.components.filter(c => c.type !== 'root').length;
+            if (!confirm(`Proceed to GM Phase?\n\nThis will analyze ${componentCount} components and create detailed file-by-file build plans for each.\n\nContinue?`)) {
+                return;
+            }
+
+            // Show loading state
+            const btn = document.querySelector('.quick-btn[onclick="startImplementation()"]');
+            const originalText = btn.textContent;
+            btn.textContent = 'Processing...';
+            btn.disabled = true;
+
+            try {
+                // First approve the design
+                const approveResponse = await fetch(`/api/projects/${projectId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!approveResponse.ok) {
+                    throw new Error('Failed to approve design');
+                }
+
+                // Then start GM phase
+                const gmResponse = await fetch(`/api/projects/${projectId}/start-gm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await gmResponse.json();
+
+                if (data.status === 'success') {
+                    alert(`GM Phase Complete!\n\nCreated build plans for ${data.work_plan.total_components} components.\n\nExecution order:\n${data.work_plan.execution_order.map((o, i) => `${i+1}. ${o.label}`).join('\n')}`);
+
+                    // Reload to show updated component data
+                    loadArchitecture(projectId);
+                } else {
+                    throw new Error(data.message || 'GM phase failed');
+                }
+            } catch (err) {
+                console.error('GM phase error:', err);
+                alert(`Error: ${err.message}`);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
         };
 
         window.generateTasks = function() {
@@ -3187,7 +3233,18 @@ ${files.map(f => `- \`${f.path}\` - ${f.purpose}`).join('\n')}
                 alert('Please select a component first');
                 return;
             }
-            alert(`Breaking down component into tasks: ${selectedComponentId}\n\nThis would create detailed tasks for each implementation step.`);
+            const comp = architecture.components.find(c => c.id === selectedComponentId);
+            if (comp && comp.subtasks && comp.subtasks.length > 0) {
+                const taskSummary = comp.subtasks.map(t => {
+                    if (t.type === 'file') return `📄 ${t.path}`;
+                    if (t.type === 'step') return `📋 Step ${t.order}: ${t.description}`;
+                    if (t.type === 'test') return `🧪 ${t.name}`;
+                    return `• ${JSON.stringify(t)}`;
+                }).join('\n');
+                alert(`Build Plan for ${comp.label}:\n\n${taskSummary}`);
+            } else {
+                alert(`No build plan yet for ${comp?.label || selectedComponentId}.\n\nRun "Proceed To GM Phase" to generate build plans.`);
+            }
         };
 
         async function renderDiagram() {

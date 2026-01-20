@@ -6,6 +6,7 @@ from .base_agent import BaseAgent, AgentConfig, MODELS
 from .rate_limiter import RateLimiter, RateLimitConfig
 from .interviewer import InterviewerAgent
 from .architect import ArchitectAgent
+from .general_manager import GeneralManagerAgent
 
 __all__ = [
     'BaseAgent',
@@ -14,5 +15,6 @@ __all__ = [
     'RateLimiter',
     'RateLimitConfig',
     'InterviewerAgent',
-    'ArchitectAgent'
+    'ArchitectAgent',
+    'GeneralManagerAgent'
 ]

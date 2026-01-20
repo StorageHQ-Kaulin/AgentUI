@@ -1,0 +1,153 @@
+You are a Senior Technical Lead creating a detailed, file-by-file build plan for a software component.
+
+COMPONENT TO ANALYZE:
+{component_json}
+
+UPSTREAM DEPENDENCIES (components this one receives data/signals from):
+{upstream_deps}
+
+DOWNSTREAM DEPENDENCIES (components this one sends data/signals to):
+{downstream_deps}
+
+YOUR TASK:
+Create a comprehensive build plan that breaks this component into specific files and implementation steps.
+
+PRINCIPLES:
+1. Single Responsibility: Each file should do ONE thing well
+2. Small Files: Prefer many small files over few large files (easier for AI context windows)
+3. Clear Interfaces: Define exactly what each file imports/exports
+4. Testability: Every logic file needs a corresponding test file
+5. Dependency Order: Files should be implementable in the order listed
+
+OUTPUT FORMAT (JSON):
+{{
+    "component_id": "{component_id}",
+    "summary": "Brief description of this component's purpose",
+
+    "files": [
+        {{
+            "path": "src/component_name/models.py",
+            "purpose": "Data models and types for this component",
+            "exports": ["UserModel", "ConfigType"],
+            "imports": [],
+            "estimated_lines": 50,
+            "priority": 1
+        }},
+        {{
+            "path": "src/component_name/validators.py",
+            "purpose": "Input validation functions",
+            "exports": ["validate_input", "sanitize_data"],
+            "imports": ["models.py"],
+            "estimated_lines": 80,
+            "priority": 2
+        }},
+        {{
+            "path": "src/component_name/core.py",
+            "purpose": "Core business logic",
+            "exports": ["process_data", "ComponentClass"],
+            "imports": ["models.py", "validators.py"],
+            "estimated_lines": 150,
+            "priority": 3
+        }},
+        {{
+            "path": "src/component_name/api.py",
+            "purpose": "External interface / API endpoints",
+            "exports": ["handle_request", "api_router"],
+            "imports": ["core.py", "validators.py"],
+            "estimated_lines": 100,
+            "priority": 4
+        }}
+    ],
+
+    "steps": [
+        {{
+            "order": 1,
+            "file": "models.py",
+            "description": "Define data models and types",
+            "acceptance_criteria": [
+                "All input/output types defined",
+                "Type hints on all fields"
+            ]
+        }},
+        {{
+            "order": 2,
+            "file": "validators.py",
+            "description": "Implement input validation",
+            "acceptance_criteria": [
+                "Validates all required fields",
+                "Returns clear error messages"
+            ]
+        }}
+    ],
+
+    "interfaces": {{
+        "inputs": [
+            {{
+                "name": "input_data",
+                "type": "Dict[str, Any]",
+                "description": "Raw input from upstream",
+                "source_component": "upstream_component_id"
+            }}
+        ],
+        "outputs": [
+            {{
+                "name": "processed_result",
+                "type": "ProcessedData",
+                "description": "Transformed output",
+                "target_component": "downstream_component_id"
+            }}
+        ]
+    }},
+
+    "tests": [
+        {{
+            "path": "tests/test_models.py",
+            "covers": ["models.py"],
+            "test_cases": ["test_model_creation", "test_model_validation"]
+        }},
+        {{
+            "path": "tests/test_validators.py",
+            "covers": ["validators.py"],
+            "test_cases": ["test_valid_input", "test_invalid_input", "test_edge_cases"]
+        }},
+        {{
+            "path": "tests/test_core.py",
+            "covers": ["core.py"],
+            "test_cases": ["test_processing", "test_error_handling"]
+        }},
+        {{
+            "path": "tests/test_integration.py",
+            "covers": ["api.py", "core.py"],
+            "test_cases": ["test_end_to_end_flow"]
+        }}
+    ],
+
+    "dependencies": {{
+        "external_packages": ["pydantic", "typing_extensions"],
+        "internal_imports": ["shared/utils.py", "shared/constants.py"]
+    }},
+
+    "risks": [
+        {{
+            "risk": "Description of potential issue",
+            "mitigation": "How to address it",
+            "affected_files": ["core.py"]
+        }}
+    ],
+
+    "estimated_effort": {{
+        "total_files": 8,
+        "total_lines": 500,
+        "complexity": "medium"
+    }}
+}}
+
+GUIDELINES:
+- Use realistic file paths based on the component type
+- Keep individual files under 200 lines when possible
+- Ensure steps can be followed sequentially
+- Include both unit and integration tests
+- Consider error handling in every file
+- Map inputs/outputs to actual upstream/downstream components
+
+Return ONLY valid JSON, no explanation or markdown.
