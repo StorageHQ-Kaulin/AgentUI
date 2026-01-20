@@ -2569,11 +2569,11 @@ KEY FUNCTIONS:
         </div>
         <div class="submenu-io" id="submenu-io"></div>
         <div class="submenu-actions">
-            <button class="submenu-action primary" onclick="openComponentFromSubmenu()">
+            <button class="submenu-action primary" id="btn-view-details">
                 <span class="submenu-action-icon">→</span>
                 View Full Details
             </button>
-            <button class="submenu-action" onclick="askAIAboutComponent()">
+            <button class="submenu-action" id="btn-ask-ai">
                 <span class="submenu-action-icon">?</span>
                 Ask AI About This
             </button>
@@ -3185,27 +3185,60 @@ KEY FUNCTIONS:
         }
 
         function openComponentFromSubmenu() {
+            console.log('[openComponentFromSubmenu] Called, submenuComponentId:', submenuComponentId);
             const compId = submenuComponentId; // Save before hiding clears it
             if (compId) {
+                console.log('[openComponentFromSubmenu] Opening component:', compId);
                 hideComponentSubmenu();
                 openComponentDetail(compId);
+            } else {
+                console.log('[openComponentFromSubmenu] No component ID!');
             }
         }
 
         function askAIAboutComponent() {
+            console.log('[askAIAboutComponent] Called, submenuComponentId:', submenuComponentId);
             const compId = submenuComponentId; // Save before hiding clears it
             if (compId) {
                 const comp = (currentBrief?.components || []).find(c => c.id === compId);
+                console.log('[askAIAboutComponent] Found comp:', comp?.label);
                 if (comp) {
                     hideComponentSubmenu();
                     openComponentDetail(compId);
                     // Wait for panel to open, then send a message
                     setTimeout(() => {
+                        console.log('[askAIAboutComponent] Sending chat message');
                         sendChatMessage('Give me a detailed explanation of this component and what it needs to accomplish');
                     }, 300);
                 }
+            } else {
+                console.log('[askAIAboutComponent] No component ID!');
             }
         }
+
+        // Set up submenu button handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnViewDetails = document.getElementById('btn-view-details');
+            const btnAskAI = document.getElementById('btn-ask-ai');
+
+            if (btnViewDetails) {
+                btnViewDetails.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    console.log('[btn-view-details] Clicked!');
+                    openComponentFromSubmenu();
+                });
+            }
+
+            if (btnAskAI) {
+                btnAskAI.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    console.log('[btn-ask-ai] Clicked!');
+                    askAIAboutComponent();
+                });
+            }
+        });
 
         // Close submenu when clicking outside
         document.addEventListener('click', (e) => {
